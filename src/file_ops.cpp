@@ -32,7 +32,20 @@ void sortByType() {
         {".zip", "ARCHIVES"},
         {".rar", "ARCHIVES"},
         {".exe", "INSTALLERS"},
-        {".dmg", "INSTALLERS"}
+        {".dmg", "INSTALLERS"},
+        {".sql", "CODE"},
+        {".cpp", "CODE"},
+        {".py", "CODE"},
+        {".js", "CODE"},
+        {".html", "CODE"},
+        {".css", "CODE"},
+        {".java", "CODE"},
+        {".c", "CODE"},
+        {".h", "CODE"},
+        {".rb", "CODE"},
+        {".go", "CODE"},
+        {".rs", "CODE"},
+        {".ts", "CODE"}
     };
 
     for (const auto& entry : fs::directory_iterator(path)) {
@@ -57,4 +70,10 @@ void sortByType() {
                       << " -> " << targetDir << "\n";
         }
     }
+}
+
+int main(int argc, char const *argv[])
+{
+    sortByType();
+    return 0;
 }

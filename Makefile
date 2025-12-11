@@ -1,29 +1,39 @@
-# Simple Makefile for filemgr
-CXX := c++
-CXXFLAGS := -std=c++17 -Wall -Iinclude
+# Compiler settings
+CXX = g++
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2
+LDFLAGS = -framework CoreFoundation -framework Security
 
-SRCDIR := src
-INCLUDEDUR := include
-OBJDIR := build
-SOURCES := $(wildcard $(SRCDIR)/*.cpp)
-OBJECTS := $(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SOURCES))
-TARGET := filemgr
+# Directories
+SRC_DIR = .
+OBJ_DIR = obj
+BIN_DIR = bin
 
-.PHONY: all clean
+# Files
+SOURCES = deduplicate.cpp
+OBJECTS = $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+TARGET = $(BIN_DIR)/dedupe
 
+# Default target
 all: $(TARGET)
 
+# Link executable
 $(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	mkdir -p $(BIN_DIR)
+	$(CXX) $(OBJECTS) -o $@ $(LDFLAGS)
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
+# Compile source files
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	mkdir -p $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(OBJDIR):
-	mkdir -p $(OBJDIR)
-
+# Clean build artifacts
 clean:
-	rm -rf $(OBJDIR) $(TARGET)
+	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
-file_dedup:
-	$(CXX) $(CXXFLAGS) $(SRCDIR)/file_dedup.cpp $(SRCDIR)/file_ops.cpp -I $(INCLUDEDUR) -o file_dedup
+# Install to system
+install: $(TARGET)
+	mkdir -p $(HOME)/.local/bin
+	cp $(TARGET) $(HOME)/.local/bin/dedupe
+	chmod +x $(HOME)/.local/bin/dedupe
+
+.PHONY: all clean install
