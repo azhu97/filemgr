@@ -3,6 +3,7 @@ CXX := c++
 CXXFLAGS := -std=c++17 -Wall -Iinclude
 
 SRCDIR := src
+INCLUDEDUR := include
 OBJDIR := build
 SOURCES := $(wildcard $(SRCDIR)/*.cpp)
 OBJECTS := $(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SOURCES))
@@ -24,3 +25,5 @@ $(OBJDIR):
 clean:
 	rm -rf $(OBJDIR) $(TARGET)
 
+file_dedup:
+	$(CXX) $(CXXFLAGS) $(SRCDIR)/file_dedup.cpp $(SRCDIR)/file_ops.cpp -I $(INCLUDEDUR) -o file_dedup

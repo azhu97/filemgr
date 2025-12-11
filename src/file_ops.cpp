@@ -1,7 +1,4 @@
 #include "file_ops.hpp"
-#include <filesystem>
-#include <iostream>
-#include <map>
 
 namespace fs = std::filesystem;
 
@@ -10,7 +7,7 @@ std::string downloadPath() {
     if (homeDir == nullptr) {
         throw std::runtime_error("Could not determine home directory.");
     } 
-    return std::string(homeDir) + "/Downloads";
+    return (std::string(homeDir) + "/Downloads");
 }
 
 void sortByType() {
@@ -19,6 +16,7 @@ void sortByType() {
 
     // mapping for file extensions to directories
     std::map<std::string, std::string> typeMap = {
+        {".jpeg", "IMAGES"},
         {".jpg", "IMAGES"},
         {".png", "IMAGES"},
         {".gif", "IMAGES"},
@@ -30,6 +28,7 @@ void sortByType() {
         {".pdf", "DOCUMENTS"},
         {".docx", "DOCUMENTS"},
         {".txt", "DOCUMENTS"},
+        {".pptx", "DOCUMENTS"},
         {".zip", "ARCHIVES"},
         {".rar", "ARCHIVES"},
         {".exe", "INSTALLERS"},
