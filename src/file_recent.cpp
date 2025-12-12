@@ -1,40 +1,6 @@
 #include "file_recent.hpp"
-#include "utils.hpp"
 
 namespace fs = std::filesystem;
-
-// Check if a file is in Downloads root or in a filemgr directory
-
-
-void putFileInDownload(const fs::path& file_path) {
-    // check if file is already in download path
-
-
-    std::string download_path = downloadPath();
-    fs::path dest = fs::path(download_path) / file_path.filename();
-
-    if (file_path == dest) {
-        std::cout << "File already in Downloads: " << file_path.filename() << "\n";
-        return;
-    }
-
-    // Handle filename collisions
-    int counter = 1;
-    while (fs::exists(dest)) {
-        std::string stem = file_path.stem().string();
-        std::string ext = file_path.extension().string();
-        dest = fs::path(download_path) / (stem + "_" + std::to_string(counter) + ext);
-        counter++;
-    }
-    
-    try {
-        fs::rename(file_path, dest);
-        std::cout << "Moved recent file: " << file_path.filename() 
-                  << " -> " << dest.filename() << "\n";
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << "Error moving file: " << e.what() << "\n";
-    }
-}
 
 void recentFile(int x) {
     std::string download_path = downloadPath();

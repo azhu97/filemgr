@@ -2,14 +2,6 @@
 
 namespace fs = std::filesystem;
 
-std::string downloadPath() {
-    const char* homeDir = getenv("HOME");
-    if (homeDir == nullptr) {
-        throw std::runtime_error("Could not determine home directory.");
-    } 
-    return (std::string(homeDir) + "/Downloads");
-}
-
 void sortByType() {
     std::string path = downloadPath();
     std::cout << "Sorting files in: " << path << "\n";

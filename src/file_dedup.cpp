@@ -1,37 +1,6 @@
 #include "file_dedup.hpp"
 
-
 namespace fs = std::filesystem;
-
-std::string computeFileHash(const fs::path& file_path) {
-    std::ifstream file(file_path, std::ifstream::binary);
-    if (!file) {
-        return "";
-    }
-
-    CC_SHA256_CTX ctx;
-    CC_SHA256_Init(&ctx);
-
-    const size_t buffer_size = 32768;
-    char buffer[buffer_size];
-
-    while (file.good()) {
-        file.read(buffer, buffer_size);
-        CC_SHA256_Update(&ctx, buffer, file.gcount());
-    }
-
-    unsigned char hash[CC_SHA256_DIGEST_LENGTH];
-    CC_SHA256_Final(hash, &ctx);
-
-    std::string hash_str;
-    for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; ++i) {
-        char buf[3];
-        snprintf(buf, sizeof(buf), "%02x", hash[i]);
-        hash_str += buf;
-    }
-
-    return hash_str;
-}
 
 void deduplicateFiles() {
     std::string download_path = downloadPath();
