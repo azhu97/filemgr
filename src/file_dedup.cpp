@@ -1,10 +1,7 @@
 #include "file_dedup.hpp"
 
-namespace fs = std::filesystem;
 
-std::unordered_set<std::string> filemgr_directories = {
-    "IMAGES", "VIDEOS", "AUDIO", "DOCUMENTS", "ARCHIVES", "INSTALLERS", "DUPLICATES", "CODE"
-};
+namespace fs = std::filesystem;
 
 std::string computeFileHash(const fs::path& file_path) {
     std::ifstream file(file_path, std::ifstream::binary);
@@ -113,8 +110,3 @@ void deduplicateFiles() {
         }
     }
 }
-
-// int main() {
-//     deduplicateFiles();
-//     return 0;
-// }

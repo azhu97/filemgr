@@ -4,3 +4,5 @@
 #include <vector>
 #include <iostream>
 #include <unordered_set>
+
+void recentFile(int x);
