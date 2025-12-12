@@ -7,9 +7,17 @@ namespace fs = std::filesystem;
 
 
 void putFileInDownload(const fs::path& file_path) {
+    // check if file is already in download path
+
+
     std::string download_path = downloadPath();
     fs::path dest = fs::path(download_path) / file_path.filename();
-    
+
+    if (file_path == dest) {
+        std::cout << "File already in Downloads: " << file_path.filename() << "\n";
+        return;
+    }
+
     // Handle filename collisions
     int counter = 1;
     while (fs::exists(dest)) {
