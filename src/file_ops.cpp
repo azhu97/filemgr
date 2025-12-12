@@ -72,8 +72,8 @@ void sortByType() {
     }
 }
 
-int main(int argc, char const *argv[])
-{
-    sortByType();
-    return 0;
-}
+// int main(int argc, char const *argv[])
+// {
+//     sortByType();
+//     return 0;
+// }

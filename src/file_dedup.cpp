@@ -1,18 +1,9 @@
-#include <iostream>
-#include <filesystem>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-#include <fstream>
-#include <sys/stat.h>
-#include <ctime>
-#include <CommonCrypto/CommonDigest.h>
-#include "file_ops.hpp"
+#include "file_dedup.hpp"
 
 namespace fs = std::filesystem;
 
 std::unordered_set<std::string> filemgr_directories = {
-    "IMAGES", "VIDEOS", "AUDIO", "DOCUMENTS", "ARCHIVES", "INSTALLERS", "DUPLICATES"
+    "IMAGES", "VIDEOS", "AUDIO", "DOCUMENTS", "ARCHIVES", "INSTALLERS", "DUPLICATES", "CODE"
 };
 
 std::string computeFileHash(const fs::path& file_path) {
@@ -123,7 +114,7 @@ void deduplicateFiles() {
     }
 }
 
-int main() {
-    deduplicateFiles();
-    return 0;
-}
+// int main() {
+//     deduplicateFiles();
+//     return 0;
+// }
