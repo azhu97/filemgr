@@ -3,6 +3,7 @@
 #include "file_ops.hpp"
 #include "file_recent.hpp"
 #include "file_dedup.hpp"
+#include "file_old.hpp"
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -11,6 +12,7 @@ int main(int argc, char* argv[]) {
         std::cout << "  sort             Sort files into directories\n";
         std::cout << "  recent <n>       Process n most recent files, or 5 by default\n";
         std::cout << "  dedup            Remove duplicate files\n";
+        std::cout << "  old <n>         Archive files older than n days\n";
         return 1;
     }
 
@@ -25,6 +27,12 @@ int main(int argc, char* argv[]) {
         recentFile(n);
     } else if (command == "dedup") {
         deduplicateFiles();
+    } else if (command == "old") {
+        int n = 30; // Default to 30 days
+        if (argc >= 3) {
+            n = std::stoi(argv[2]);
+        }
+        archiveOld(n);
     } else {
         std::cout << "Unknown command: " << command << "\n";
         std::cout << "Usage: filemgr <command> [options]\n";
@@ -32,6 +40,7 @@ int main(int argc, char* argv[]) {
         std::cout << "  sort             Sort files into directories\n";
         std::cout << "  recent <n>       Process n most recent files, or 5 by default\n";
         std::cout << "  dedup            Remove duplicate files\n";
+        std::cout << "  old <n>         Archive files older than n days\n";
         return 1;
     }
 }

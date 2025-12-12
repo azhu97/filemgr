@@ -1,26 +1,10 @@
 #include "file_recent.hpp"
-
+#include "utils.hpp"
 
 namespace fs = std::filesystem;
 
-std::unordered_set<std::string> filemgr_directories = {
-    "IMAGES", "VIDEOS", "AUDIO", "DOCUMENTS", "ARCHIVES", "INSTALLERS", "DUPLICATES", "CODE"
-};
-
 // Check if a file is in Downloads root or in a filemgr directory
-bool isInAllowedLocation(const fs::path& file_path, const fs::path& download_path) {
-    // Get the relative path from Downloads
-    fs::path relative = fs::relative(file_path, download_path);
-    
-    // If file is directly in Downloads (no parent directories)
-    if (!relative.has_parent_path() || relative.parent_path() == ".") {
-        return true;
-    }
-    
-    // Check if first directory in path is a filemgr directory
-    std::string first_dir = relative.begin()->string();
-    return filemgr_directories.find(first_dir) != filemgr_directories.end();
-}
+
 
 void putFileInDownload(const fs::path& file_path) {
     std::string download_path = downloadPath();
