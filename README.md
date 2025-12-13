@@ -6,4 +6,6 @@ Run mgr (or whatever name you choose) to see the available list of commands and 
 
 In order to run the upload command, make sure you have rclone installed -> "brew install rclone"
 
-Run "rclone config" and follow the config instructions, note to also make sure to name the project "gdrive", otherwise update the code in "file_upload.cpp" to correspond. Note that upload is only for google drives, so configure with that in mind. 
+Run "rclone config" and follow the config instructions, note to also make sure to name the project "gdrive", otherwise update the code in "file_upload.cpp" to correspond. Note that upload is only for google drives, so configure with that in mind. If you rebuild, make sure to remake. 
+
+Folders that are not made by filemgr will not be manipulated in anyway, so if you have files that you don't want touched, put them in a "PROTECTED" folder. 
