@@ -4,6 +4,7 @@
 #include "file_recent.hpp"
 #include "file_dedup.hpp"
 #include "file_old.hpp"
+#include "file_upload.hpp"
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -13,6 +14,7 @@ int main(int argc, char* argv[]) {
         std::cout << "  recent <n>       Process n most recent files, or 5 by default\n";
         std::cout << "  dedup            Remove duplicate files\n";
         std::cout << "  old <n>         Archive files older than n days\n";
+        std::cout << "  upload <folder>  Upload folder from Downloads to Google Drive\n";
         return 1;
     }
 
@@ -33,6 +35,13 @@ int main(int argc, char* argv[]) {
             n = std::stoi(argv[2]);
         }
         archiveOld(n);
+    } else if (command == "upload") {
+        if (argc < 3) {
+            std::cout << "Usage: filemgr upload <folder>\n";
+            return 1;
+        }
+        std::string folder_name = argv[2];
+        uploadFolder(folder_name);
     } else {
         std::cout << "Unknown command: " << command << "\n";
         std::cout << "Usage: filemgr <command> [options]\n";
@@ -41,6 +50,7 @@ int main(int argc, char* argv[]) {
         std::cout << "  recent <n>       Process n most recent files, or 5 by default\n";
         std::cout << "  dedup            Remove duplicate files\n";
         std::cout << "  old <n>         Archive files older than n days\n";
+        std::cout << "  upload <folder>  Upload folder from Downloads to Google Drive\n";
         return 1;
     }
 }
