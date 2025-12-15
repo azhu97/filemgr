@@ -23,6 +23,10 @@ void deduplicateFiles() {
             continue;
         }
 
+        if (!isInAllowedLocation(entry.path(), download_path)) {
+            continue;
+        }
+
         std::string file_hash = computeFileHash(entry.path());
         if (file_hash.empty()) {
             std::cerr << "Failed to hash: " << entry.path() << "\n";

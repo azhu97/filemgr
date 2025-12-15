@@ -5,8 +5,12 @@
 #include "file_dedup.hpp"
 #include "file_old.hpp"
 #include "file_upload.hpp"
+#include <chrono>
 
 int main(int argc, char* argv[]) {
+    // Start time measurement
+    auto start_time = std::chrono::high_resolution_clock::now();
+
     if (argc < 2) {
         std::cout << "Usage: filemgr <command> [options]\n";
         std::cout << "Commands:\n";
@@ -53,4 +57,10 @@ int main(int argc, char* argv[]) {
         std::cout << "  upload <folder>  Upload folder from Downloads to Google Drive\n";
         return 1;
     }
+
+    // End time measurement
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double> elapsed = end_time - start_time;
+    std::cout << "Execution time: " << elapsed.count() << " seconds\n";
 }
