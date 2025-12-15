@@ -84,3 +84,5 @@ void putFileInDownload(const fs::path& file_path) {
         std::cerr << "Error moving file: " << e.what() << "\n";
     }
 }
+
+// Create a threadsafe queue
