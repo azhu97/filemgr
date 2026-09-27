@@ -27,6 +27,7 @@ Requires macOS and the Xcode command line tools (`xcode-select --install`).
 | `upload <folder>`  | Upload a folder to Google Drive via `rclone` (`--remote NAME` to pick a remote) |
 | `history [id]`     | List recent runs, or every move made by run `id` (`--limit N`) |
 | `undo [id]`        | Reverse the last run (or run `id`), moving files back where they came from |
+| `config [action]`  | `show` the effective config, print its `path`, `init` a starter file, or `edit` it |
 | `help [command]`   | Show usage, or detailed help for one command                   |
 
 ### Global options
@@ -35,6 +36,7 @@ Requires macOS and the Xcode command line tools (`xcode-select --install`).
 |---------------------|-----------------------------------------------------------|
 | `-n`, `--dry-run`   | Show what would happen without changing anything          |
 | `-p`, `--path DIR`  | Manage `DIR` instead of `~/Downloads`                     |
+| `-c`, `--config FILE` | Use a different config file                             |
 | `-v`, `--verbose`   | Extra detail (skipped files, thread counts, timing)       |
 | `-q`, `--quiet`     | Only errors and the final summary line                    |
 | `--no-color`        | Plain output (also honoured via `$NO_COLOR`)              |
@@ -48,6 +50,29 @@ Options can go before or after the command: `filemgr -n sort` and
 default folder, which is handy for experimenting on a scratch directory.
 
 Exit status is `0` on success, `1` on a runtime error, and `2` on a usage error.
+
+## Configuration
+
+filemgr works with no configuration. To customise it, run `filemgr config init`
+to write a commented starter file to `~/.config/filemgr/config` (or
+`$XDG_CONFIG_HOME/filemgr/config`, or `$FILEMGR_CONFIG`), then `filemgr config edit`.
+
+```ini
+[general]
+root = ~/Downloads        # folder to manage
+remote = gdrive           # rclone remote for upload
+old_days = 30             # default for 'filemgr old'
+recent_count = 5          # default for 'filemgr recent'
+threads = 0               # dedup hashing threads (0 = one per core)
+
+[categories]
+SPREADSHEETS = csv xlsx numbers   # new folder; takes these extensions from DOCUMENTS
+IMAGES = jpg png heic             # redefining a built-in folder replaces its list
+```
+
+Custom category folders are managed exactly like the built-in ones. The folder
+to manage is chosen in this order: `--path`, `$FILEMGR_ROOT`, `root` in the
+config, then `~/Downloads`. Run `filemgr config` to see the result.
 
 ## Undo
 
@@ -90,7 +115,9 @@ filemgr/
 │   └── watch-daemon.md
 ├── include/              Public headers, one per module
 │   ├── cli.hpp           Argument parser (options, positionals, help formatting)
-│   ├── context.hpp       Context: managed root folder and run-wide flags
+│   ├── config.hpp        Config file format, defaults and loader
+│   ├── context.hpp       Context: managed root, config, journal, run-wide flags
+│   ├── file_config.hpp   config command
 │   ├── file_dedup.hpp
 │   ├── file_history.hpp  history / undo commands
 │   ├── file_old.hpp
@@ -102,6 +129,8 @@ filemgr/
 │   └── utils.hpp         Shared helpers: safeMove, hashing, allowed-location check
 └── src/                  Implementation, one file per module
     ├── cli.cpp
+    ├── config.cpp        Built-in categories and INI parser
+    ├── file_config.cpp   config show/path/init/edit
     ├── main.cpp          Command table, global options, dispatch
     ├── file_dedup.cpp    dedup: size pre-filter + parallel SHA-256
     ├── file_history.cpp  history listing and undo

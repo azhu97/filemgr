@@ -5,6 +5,16 @@ merged into `main`.
 
 ## Unreleased
 
+### Configuration (`feature/config`)
+- New INI-style config file at `~/.config/filemgr/config` (`--config FILE`,
+  `$FILEMGR_CONFIG` and `$XDG_CONFIG_HOME` are respected).
+- `[general]`: `root`, `remote`, `old_days`, `recent_count`, `threads`.
+- `[categories]`: add new type folders or redefine built-in ones; custom
+  folders are managed (and protected-folder rules apply) like the built-ins.
+- Many more built-in extensions (webp, avif, mov, flac, xlsx, 7z, pkg, json, ...).
+- New `config` command: `show` (default), `path`, `init [--force]`, `edit`.
+- Hard-coded `gdrive` remote is now just the default.
+
 ### Undo journal (`feature/undo-journal`)
 - Every move made by `sort`, `recent`, `dedup`, `old` and `undo` is appended
   to `~/.filemgr/journal` (or `$FILEMGR_STATE_DIR/journal`) as it happens.
