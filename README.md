@@ -9,6 +9,7 @@ files, and upload folders to Google Drive.
 ```sh
 make                 # builds ./filemgr
 make install         # installs to ~/.local/bin/filemgr (override with PREFIX=...)
+make test            # unit + end-to-end tests (never touch your real Downloads)
 ```
 
 Make sure `~/.local/bin` is on your `PATH`, or install system-wide with
@@ -127,20 +128,28 @@ filemgr/
 │   ├── journal.hpp       Append-only move journal (runs, moves, undo markers)
 │   ├── ui.hpp            Colored, leveled, thread-safe terminal output
 │   └── utils.hpp         Shared helpers: safeMove, hashing, allowed-location check
-└── src/                  Implementation, one file per module
-    ├── cli.cpp
-    ├── config.cpp        Built-in categories and INI parser
-    ├── file_config.cpp   config show/path/init/edit
-    ├── main.cpp          Command table, global options, dispatch
-    ├── file_dedup.cpp    dedup: size pre-filter + parallel SHA-256
-    ├── file_history.cpp  history listing and undo
-    ├── file_old.cpp      old: archive stale files into OLD/
-    ├── file_ops.cpp      sort: move files into type folders
-    ├── file_recent.cpp   recent: surface recently modified files
-    ├── file_upload.cpp   upload: rclone wrapper (spawned without a shell)
-    ├── journal.cpp
-    ├── ui.cpp
-    └── utils.cpp
+├── src/                  Implementation, one file per module
+│   ├── cli.cpp
+│   ├── config.cpp        Built-in categories and INI parser
+│   ├── file_config.cpp   config show/path/init/edit
+│   ├── main.cpp          Command table, global options, dispatch
+│   ├── file_dedup.cpp    dedup: size pre-filter + parallel SHA-256
+│   ├── file_history.cpp  history listing and undo
+│   ├── file_old.cpp      old: archive stale files into OLD/
+│   ├── file_ops.cpp      sort: move files into type folders
+│   ├── file_recent.cpp   recent: surface recently modified files
+│   ├── file_upload.cpp   upload: rclone wrapper (spawned without a shell)
+│   ├── journal.cpp
+│   ├── ui.cpp
+│   └── utils.cpp
+└── tests/
+    ├── testing.hpp       Tiny test framework (TEST, CHECK, CHECK_EQ, CHECK_THROWS)
+    ├── test_main.cpp     Runner: temp dir per test, isolated state/config
+    ├── test_cli.cpp      Argument parser
+    ├── test_config.cpp   Config loading and validation
+    ├── test_utils.cpp    safeMove, journal, hashing, allowed locations
+    ├── test_commands.cpp sort/dedup/old/recent/undo on fake folders
+    └── e2e.sh            End-to-end tests of the built binary
 ```
 
 Build output goes to `build/` (objects) and `./filemgr` (binary); both are git-ignored.
@@ -153,3 +162,5 @@ Build output goes to `build/` (objects) and `./filemgr` (binary); both are git-i
    scan with `isInAllowedLocation()` so user folders stay untouched.
 3. Register it in the command table in `src/main.cpp`, with `journaled = true`
    if it moves files.
+4. Add tests in `tests/test_commands.cpp` (and `tests/e2e.sh` for CLI
+   behaviour), then run `make test`. Run a subset with `build/unit_tests <name-filter>`.
