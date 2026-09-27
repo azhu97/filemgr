@@ -5,6 +5,17 @@ merged into `main`.
 
 ## Unreleased
 
+### Rules engine (`feature/rules-engine`)
+- `[rule "Name"]` sections in the config: conditions `match`, `ext`, `type`,
+  `larger`, `smaller`, `older`, `newer`, `in`, plus `action = trash | move FOLDER`
+  and `enabled`.
+- New `clean [rule...]` command applies enabled rules (or the named ones);
+  `--list` shows live match counts. Supports `--dry-run`.
+- `trash` moves to `~/.Trash` (override: `$FILEMGR_TRASH`) and is journaled,
+  so `undo` restores trashed files.
+- Safety: rules only act on filemgr-managed files, need at least one
+  condition, and cannot target paths outside the managed folder.
+
 ### Search (`feature/search`)
 - New read-only `find` command: name globs or substrings, `--type`, `--ext`,
   `--larger`/`--smaller`, `--older`/`--newer`, `--in FOLDER`, `--sort`,
