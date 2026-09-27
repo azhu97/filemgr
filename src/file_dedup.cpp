@@ -50,22 +50,10 @@ void deduplicateFiles() {
                     hash_map[file_hash] = new_file; // Update map if the newer file was actually older
                 }
 
-                // Handle filename collisions in DUPLICATES folder
-                fs::path dest = duplicates_path / file_to_move.filename();
-                int counter = 1;
-                while (fs::exists(dest)) {
-                    std::string stem = file_to_move.stem().string();
-                    std::string ext = file_to_move.extension().string();
-                    dest = duplicates_path / (stem + "_" + std::to_string(counter) + ext);
-                    counter++;
-                }
-
-                try {
-                    fs::rename(file_to_move, dest);
-                    std::cout << "Moved duplicate: " << file_to_move.filename() 
+                fs::path dest = safeMove(file_to_move, duplicates_path);
+                if (!dest.empty()) {
+                    std::cout << "Moved duplicate: " << file_to_move.filename()
                               << " -> DUPLICATES/" << dest.filename() << "\n";
-                } catch (const fs::filesystem_error& e) {
-                    std::cerr << "Error moving file: " << e.what() << "\n";
                 }
             }
         }

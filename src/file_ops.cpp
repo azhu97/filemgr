@@ -47,21 +47,17 @@ void sortByType() {
             continue; // skip non-regular files
         }
 
-        std::string path_extension = entry.path().extension().string();
+        // Match extensions case-insensitively so photo.JPG sorts like photo.jpg
+        auto it = typeMap.find(lowerExtension(entry.path()));
+        if (it == typeMap.end()) {
+            continue;
+        }
 
-        if (typeMap.find(path_extension) != typeMap.end()) {
-            std::string targetDir = path + "/" + typeMap[path_extension];
-            fs::create_directories(targetDir); // create target directory if it doesn't exist
-
-            // newPath is equal to targetDir + "/" + filename
-            fs::path newPath = targetDir + "/" + entry.path().filename().string();
-            
-            // move entry from old path to new path using rename
-            fs::rename(entry.path(), newPath);
-
-            // print statement
+        fs::path targetDir = fs::path(path) / it->second;
+        fs::path newPath = safeMove(entry.path(), targetDir);
+        if (!newPath.empty()) {
             std::cout << "Moved " << entry.path().filename().string()
-                      << " -> " << targetDir << "\n";
+                      << " -> " << it->second << "/" << newPath.filename().string() << "\n";
         }
     }
 }
