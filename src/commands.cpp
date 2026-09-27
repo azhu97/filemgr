@@ -1,4 +1,5 @@
 #include "commands.hpp"
+#include "completions.hpp"
 #include "config.hpp"
 #include "file_clean.hpp"
 #include "file_config.hpp"
@@ -93,10 +94,21 @@ const std::vector<Command>& commands() {
              return watchDownloads(ctx, options);
          }},
         {"clean", "[rule...]", "Apply the cleanup rules from your config (all enabled rules, or those named)",
-         {{"list", 0, "", "List rules and how many files each matches right now"}},
+         {{"list", 0, "", "List rules and how many files each matches right now"},
+          {"names", 0, "", "Print rule names only, one per line (for scripts)"}},
          true, true,
          [](const Context& ctx, const ParsedArgs& a) {
+             if (a.has("names")) {
+                 for (const auto& r : ctx.config->rules) std::cout << r.name << "\n";
+                 return 0;
+             }
              return cleanWithRules(ctx, a.positionals, a.has("list"));
+         }},
+        {"completions", "<shell>", "Print a completion script for zsh, bash or fish",
+         {}, false, false,
+         [](const Context& ctx, const ParsedArgs& a) {
+             if (a.positionals.empty()) throw UsageError("completions requires a shell: zsh, bash or fish");
+             return printCompletions(a.positionals[0], *ctx.config);
          }},
         {"stats", "", "Report disk usage by type, folder and age, plus cleanup opportunities",
          {{"top", 0, "N", "Number of largest files to list (default 10)"},
@@ -154,7 +166,7 @@ const std::vector<Command>& commands() {
          [](const Context& ctx, const ParsedArgs& a) {
              return undoRun(ctx, parseCount(positional(a, 0, "0"), "id"));
          }},
-        {"config", "[show|path|init|edit]", "Show the effective configuration, or create/edit the config file",
+        {"config", "[action]", "Show the effective config, or: path, init, edit",
          {{"force", 'f', "", "With init: overwrite an existing config file"}}, false, false,
          [](const Context& ctx, const ParsedArgs& a) {
              return configCommand(*ctx.config, configPath(a), positional(a, 0, "show"), a.has("force"));
