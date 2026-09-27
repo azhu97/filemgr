@@ -1,5 +1,9 @@
 # Watch Daemon
 
+> **Status: implemented** in `feature/watch-daemon`. See
+> [Implementation notes](#implementation-notes) at the end for how the open
+> questions were resolved.
+
 ## Problem
 
 Every filemgr command today is a manual, one-shot invocation — the user has to remember to run `sort`, `dedup`, `old`, `recent` themselves. Downloads folders get messy between runs.
@@ -37,3 +41,72 @@ A `filemgr watch` command that runs as a long-lived process, reacts to filesyste
 - Linux/`inotify` support — FSEvents is macOS-only, matching the rest of the codebase's existing macOS-only assumption (CommonCrypto).
 - A GUI or menu-bar indicator that the daemon is running.
 - Auto-installing/managing the `launchd` job from within the `filemgr` binary itself (e.g. a `filemgr watch --install` command) — worth considering later, but v1 ships the `.plist` as a template the user installs manually.
+
+## Implementation notes
+
+**Usage:** `filemgr watch [--settle SECONDS] [--sort-existing]`, plus
+`filemgr watch --print-plist` to generate a launchd agent.
+
+**Files:** `include/file_watch.hpp`, `src/file_watch.cpp`,
+`launchd/com.filemgr.watch.plist` (template). Per-file sorting is shared with
+`sort` through `sortOneFile()` in `file_ops`.
+
+### How it works
+
+- An `FSEventStream` with `kFSEventStreamCreateFlagFileEvents` runs on a
+  serial dispatch queue (the modern replacement for the deprecated run-loop
+  scheduling). The callback only records `path -> last event time` for regular
+  files directly in the root. The main thread decides what to sort.
+- FSEvents reports resolved paths (`/private/var/...`), so the watcher works on
+  `fs::canonical(root)`.
+- `MustScanSubDirs` / `RootChanged` events (dropped events) trigger a
+  re-check of every top-level file.
+
+### Debounce window (open question 1)
+
+A file is sorted when both conditions hold:
+
+1. No events for `--settle` seconds (default **2s**).
+2. Its size is **unchanged across one further settle window**. A download
+   that pauses between chunks without generating events is still caught by
+   the size check, which restarts the wait.
+
+Separately, known partial-download extensions (`.crdownload`, `.download`,
+`.part`, `.partial`, `.tmp`, `.opdownload`, `.!qb`) are never sorted. Browsers
+rename to the final name when finished, and that rename is a new event for
+the real file. In testing, a file appended to every 0.6s was left alone until
+writes stopped.
+
+### Extending beyond sort (open question 2)
+
+Left manual for now, as planned. `dedup`/`old` are whole-folder scans and fit
+better as a `cron`/`launchd` `StartCalendarInterval` job than inside the event
+loop.
+
+### Multiple instances (open question 3)
+
+Resolved: `watch` takes an exclusive `flock` on `~/.filemgr/watch.lock`
+(written with the PID) and exits with status 1 if another watcher holds it.
+The lock is released automatically by the kernel if the process dies, so
+there are no stale locks.
+
+### Logging (open question 4)
+
+In the foreground, `watch` logs timestamped lines to stdout. The generated
+plist sends stdout and stderr to `~/Library/Logs/filemgr-watch.log`, which
+Console.app shows under "Log Reports". Output is uncolored when not on a
+terminal. Rotation is not handled, since the log grows by one line per sorted
+file.
+
+### Undo
+
+Each batch of files sorted together is journaled as its own run named
+`watch`, so `filemgr undo` reverses the latest batch.
+
+### macOS privacy prompt
+
+Because `~/Downloads` is a TCC-protected folder, the first run under launchd
+may trigger a "would like to access files in your Downloads folder" prompt.
+If the agent can't read the folder (errors in the log), grant the binary
+access in System Settings → Privacy & Security → Files and Folders (or Full
+Disk Access).

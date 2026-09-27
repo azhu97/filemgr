@@ -86,6 +86,29 @@ printf '[bad\n' >> "$FILEMGR_CONFIG"
 run sort 2>/dev/null;               check "bad config exits 1" [ $? -eq 1 ]
 rm -f "$FILEMGR_CONFIG"
 
+# --- watch ------------------------------------------------------------------
+fresh
+"$BIN" --path "$DL" watch --settle 0.5 >"$WORK/watch.log" 2>&1 &
+WATCH_PID=$!
+sleep 1
+"$BIN" --path "$DL" watch >/dev/null 2>&1; check "second watcher refused" [ $? -eq 1 ]
+echo data > "$DL/new.png"
+echo part > "$DL/big.pdf.crdownload"
+mkdir -p "$DL/PROTECTED"; echo x > "$DL/PROTECTED/keep.png"
+sleep 2.5
+check "watch sorts new file"          [ -f "$DL/IMAGES/new.png" ]
+check "watch ignores partial download" [ -f "$DL/big.pdf.crdownload" ]
+check "watch ignores user folders"    [ -f "$DL/PROTECTED/keep.png" ]
+mv "$DL/big.pdf.crdownload" "$DL/big.pdf"
+sleep 2.5
+check "watch sorts finished download" [ -f "$DL/DOCUMENTS/big.pdf" ]
+kill -TERM "$WATCH_PID"; wait "$WATCH_PID"
+check "watch exits cleanly on SIGTERM" [ $? -eq 0 ]
+run undo >/dev/null
+check "undo reverses last watch batch" [ -f "$DL/big.pdf" ]
+"$BIN" --path "$DL" watch --print-plist | plutil -lint - >/dev/null
+check "printed plist is valid"        [ $? -eq 0 ]
+
 # --- quiet ------------------------------------------------------------------
 fresh; touch "$DL/x.png"
 out="$(run -q sort)"
