@@ -11,6 +11,7 @@
 #include "file_ops.hpp"
 #include "file_recent.hpp"
 #include "file_dedup.hpp"
+#include "file_near.hpp"
 #include "file_old.hpp"
 #include "file_upload.hpp"
 #include "file_history.hpp"
@@ -76,8 +77,18 @@ const std::vector<Command>& commands() {
              std::string fallback = std::to_string(ctx.config->recent_count);
              return recentFile(ctx, parseCount(positional(a, 0, fallback), "n"));
          }},
-        {"dedup", "", "Move byte-identical duplicates into DUPLICATES/, keeping the oldest copy", {}, true, true,
-         [](const Context& ctx, const ParsedArgs&) { return deduplicateFiles(ctx); }},
+        {"dedup", "", "Move byte-identical duplicates into DUPLICATES/, keeping the oldest copy",
+         {{"near", 0, "", "Also move visually similar images into DUPLICATES/NEAR/"},
+          {"threshold", 't', "N", "Near-duplicate sensitivity, 0-64 bits (default 6; higher matches more)"}},
+         true, true,
+         [](const Context& ctx, const ParsedArgs& a) {
+             int threshold = parseCount(a.get("threshold", std::to_string(kDefaultNearThreshold)), "--threshold");
+             if (threshold > 64) throw UsageError("--threshold must be between 0 and 64");
+             if (a.has("threshold") && !a.has("near")) throw UsageError("--threshold only applies with --near");
+             int status = deduplicateFiles(ctx);
+             if (status == 0 && a.has("near")) status = findNearDuplicates(ctx, threshold);
+             return status;
+         }},
         {"old", "[days]", "Archive files untouched for this many days into OLD/ (default 30, see config)", {}, true, true,
          [](const Context& ctx, const ParsedArgs& a) {
              std::string fallback = std::to_string(ctx.config->old_days);

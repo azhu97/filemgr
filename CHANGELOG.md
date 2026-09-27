@@ -5,6 +5,16 @@ merged into `main`.
 
 ## Unreleased
 
+### Near-duplicate detection (`feature/near-duplicate-detection`)
+- `dedup --near` finds visually similar images (resized, re-compressed or
+  format-converted copies) and moves them into `DUPLICATES/NEAR/`, keeping the
+  highest-resolution copy. `--threshold N` (0-64, default 6) tunes sensitivity.
+- Fingerprints combine a 64-bit dHash with a 4x4 color grid, so recolored
+  variants are not flagged.
+- Images are decoded with the macOS ImageIO framework (HEIC, WebP, AVIF, ...);
+  the build now links `CoreGraphics` and `ImageIO`.
+- Design doc updated with implementation notes and measured thresholds.
+
 ### Test suite (`feature/test-suite`)
 - `make test` builds and runs unit tests (`build/unit_tests`) and end-to-end
   tests (`tests/e2e.sh`). Neither touches your real Downloads, state or config.
