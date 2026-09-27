@@ -14,6 +14,8 @@
 #include "file_near.hpp"
 #include "file_watch.hpp"
 #include "stats.hpp"
+#include "file_find.hpp"
+#include "filter.hpp"
 #include "file_old.hpp"
 #include "file_upload.hpp"
 #include "file_history.hpp"
@@ -129,6 +131,43 @@ const std::vector<Command>& commands() {
          false, true,
          [](const Context& ctx, const ParsedArgs& a) {
              return showStats(ctx, parseCount(a.get("top", "10"), "--top"), !a.has("no-dups"), a.get("html"));
+         }},
+        {"find", "[pattern...]", "Search files by name, type, size and age (read-only)",
+         {{"type", 'T', "CATEGORY", "Only files in this category (IMAGES, VIDEOS, ..., Other)"},
+          {"ext", 'e', "LIST", "Only these extensions, e.g. jpg,png"},
+          {"larger", 0, "SIZE", "At least SIZE, e.g. 100M"},
+          {"smaller", 0, "SIZE", "At most SIZE, e.g. 10K"},
+          {"older", 0, "AGE", "Last modified at least AGE ago, e.g. 30d, 6m, 1y"},
+          {"newer", 0, "AGE", "Last modified within AGE, e.g. 12h, 2w"},
+          {"in", 0, "FOLDER", "Search only this subfolder"},
+          {"sort", 0, "KEY", "date (default, newest first), size or name"},
+          {"limit", 'l', "N", "Show at most N results"},
+          {"paths", 0, "", "Print bare absolute paths (for piping)"},
+          {"print0", '0', "", "Like --paths, NUL-separated (for xargs -0)"},
+          {"hidden", 0, "", "Include dotfiles and hidden folders"}},
+         false, true,
+         [](const Context& ctx, const ParsedArgs& a) {
+             FindOptions o;
+             try {
+                 o.filter.names = a.positionals;
+                 if (a.has("ext")) o.filter.addExtensions(a.get("ext"));
+                 o.filter.category = a.get("type");
+                 if (a.has("larger")) o.filter.min_size = parseSize(a.get("larger"));
+                 if (a.has("smaller")) o.filter.max_size = parseSize(a.get("smaller"));
+                 if (a.has("older")) o.filter.min_age = parseAge(a.get("older"));
+                 if (a.has("newer")) o.filter.max_age = parseAge(a.get("newer"));
+             } catch (const FilterError& e) {
+                 throw UsageError(e.what());
+             }
+             o.within = a.get("in");
+             o.sort = a.get("sort", "date");
+             if (o.sort != "date" && o.sort != "size" && o.sort != "name")
+                 throw UsageError("--sort must be date, size or name");
+             o.limit = parseCount(a.get("limit", "0"), "--limit");
+             o.null_separated = a.has("print0");
+             o.paths_only = a.has("paths") || o.null_separated;
+             o.include_hidden = a.has("hidden");
+             return findFiles(ctx, o);
          }},
         {"history", "[id]", "List recent runs, or every move made by run <id>",
          {{"limit", 'l', "N", "Number of runs to list (default 15)"}}, false, false,
