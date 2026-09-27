@@ -5,6 +5,15 @@ merged into `main`.
 
 ## Unreleased
 
+### Stats and reports (`feature/stats-report`)
+- New read-only `stats` command: usage by type, folder and last-modified age,
+  the largest files, and cleanup opportunities (duplicate waste, stale files,
+  unsorted files) with the command that addresses each.
+- `stats --html FILE` writes a self-contained HTML report (light/dark,
+  hover tooltips, works at phone width, no network access).
+- Exact-duplicate search moved into `duplicates.{hpp,cpp}` and shared by
+  `dedup` and `stats`. `dedup` output is now deterministic.
+
 ### Watch daemon (`feature/watch-daemon`)
 - New `watch` command sorts new files as they arrive, using FSEvents.
   Waits for files to settle (`--settle`, default 2s, plus a size-stability
