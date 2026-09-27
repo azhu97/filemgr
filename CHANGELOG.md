@@ -5,6 +5,22 @@ merged into `main`.
 
 ## Unreleased
 
+### Search (`feature/search`)
+- New read-only `find` command: name globs or substrings, `--type`, `--ext`,
+  `--larger`/`--smaller`, `--older`/`--newer`, `--in FOLDER`, `--sort`,
+  `--limit`, `--hidden`, and `--paths`/`--print0` for piping.
+- New `FileFilter` module (`filter.{hpp,cpp}`) with human-friendly size (`1.5G`)
+  and age (`2w`, `6m`) parsing, reused by the rules engine.
+
+### Stats and reports (`feature/stats-report`)
+- New read-only `stats` command: usage by type, folder and last-modified age,
+  the largest files, and cleanup opportunities (duplicate waste, stale files,
+  unsorted files) with the command that addresses each.
+- `stats --html FILE` writes a self-contained HTML report (light/dark,
+  hover tooltips, works at phone width, no network access).
+- Exact-duplicate search moved into `duplicates.{hpp,cpp}` and shared by
+  `dedup` and `stats`. `dedup` output is now deterministic.
+
 ### Watch daemon (`feature/watch-daemon`)
 - New `watch` command sorts new files as they arrive, using FSEvents.
   Waits for files to settle (`--settle`, default 2s, plus a size-stability

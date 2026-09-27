@@ -1,9 +1,7 @@
 #include "file_dedup.hpp"
 #include "config.hpp"
-#include <thread>
-#include <vector>
-#include <mutex>
-#include <map>
+#include "duplicates.hpp"
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -17,103 +15,35 @@ time_t birthTime(const fs::path& p) {
 } // namespace
 
 int deduplicateFiles(const Context& ctx) {
-    const fs::path& download_path = ctx.root;
-    fs::path duplicates_path = download_path / "DUPLICATES";
+    const fs::path duplicates_path = ctx.root / "DUPLICATES";
+    ui::info("Deduplicating files in " + ui::bold(ctx.root.string()));
 
-    ui::info("Deduplicating files in " + ui::bold(download_path.string()));
+    auto candidates = dedupCandidates(ctx.root);
+    auto groups = findExactDuplicates(candidates, ctx.config->threads);
 
-    // 1. Scan: group candidate files by size. Files with a unique size cannot
-    //    have a byte-identical twin, so they are never hashed.
-    std::map<std::uintmax_t, std::vector<fs::path>> by_size;
-    std::size_t scanned = 0;
-    for (const auto& entry : fs::recursive_directory_iterator(
-             download_path, fs::directory_options::skip_permission_denied)) {
-        if (!entry.is_regular_file() || isHidden(entry.path())) {
-            continue;
-        }
-        // Skip the DUPLICATES directory itself and anything outside filemgr's folders
-        const fs::path& p = entry.path();
-        if (!isInAllowedLocation(p, download_path) || topLevelFolder(p, download_path) == "DUPLICATES") {
-            continue;
-        }
-        std::error_code ec;
-        auto size = entry.file_size(ec);
-        if (ec || size == 0) continue; // empty files are trivially "identical"; leave them
-        by_size[size].push_back(p);
-        scanned++;
-    }
-
-    // Shared resources
-    std::unordered_map<std::string, fs::path> hash_map;
-    std::mutex map_mutex;
-    ThreadSafeQueue<fs::path> task_queue;
     std::size_t moved = 0;
     std::uintmax_t reclaimed = 0;
-
-    // Worker function
-    auto worker = [&]() {
-        fs::path current_file;
-        while (task_queue.pop(current_file)) {
-            std::string file_hash = computeFileHash(current_file);
-            if (file_hash.empty()) {
-                ui::warn("failed to hash " + current_file.string());
-                continue;
-            }
-
-            // Lock the map to check/insert and handle moves safely
-            std::lock_guard<std::mutex> lock(map_mutex);
-            auto it = hash_map.find(file_hash);
-            if (it == hash_map.end()) {
-                hash_map[file_hash] = current_file;
-                continue;
-            }
-
-            // Keep whichever copy was created first; move the other.
-            fs::path existing_file = it->second;
-            fs::path file_to_move = current_file;
-            if (birthTime(current_file) < birthTime(existing_file)) {
-                file_to_move = existing_file;
-                it->second = current_file;
-            }
-
+    for (auto& group : groups) {
+        // Keep whichever copy was created first (path breaks ties); move the rest.
+        std::sort(group.begin(), group.end(), [](const fs::path& a, const fs::path& b) {
+            time_t ta = birthTime(a), tb = birthTime(b);
+            return ta != tb ? ta < tb : a < b;
+        });
+        const fs::path& keeper = group.front();
+        for (std::size_t i = 1; i < group.size(); ++i) {
             std::error_code ec;
-            auto size = fs::file_size(file_to_move, ec);
-            fs::path dest = safeMove(ctx, file_to_move, duplicates_path);
-            if (!dest.empty()) {
-                ui::action("dup", displayPath(ctx, file_to_move),
-                           displayPath(ctx, dest) + ui::dim("  (copy of " + displayPath(ctx, it->second) + ")"));
-                moved++;
-                if (!ec) reclaimed += size;
-            }
-        }
-    };
-
-    // 2. Start worker threads
-    unsigned int num_threads = ctx.config->threads;
-    if (num_threads == 0) num_threads = std::max(1u, std::thread::hardware_concurrency());
-    std::vector<std::thread> threads;
-    for (unsigned int i = 0; i < num_threads; ++i) {
-        threads.emplace_back(worker);
-    }
-
-    // 3. Producer: queue only files that share a size with another file
-    std::size_t hashed = 0;
-    for (const auto& [size, paths] : by_size) {
-        if (paths.size() < 2) continue;
-        for (const auto& p : paths) {
-            task_queue.push(p);
-            hashed++;
+            auto size = fs::file_size(group[i], ec);
+            fs::path dest = safeMove(ctx, group[i], duplicates_path);
+            if (dest.empty()) continue;
+            ui::action("dup", displayPath(ctx, group[i]),
+                       displayPath(ctx, dest) + ui::dim("  (copy of " + displayPath(ctx, keeper) + ")"));
+            moved++;
+            if (!ec) reclaimed += size;
         }
     }
 
-    // 4. Signal completion and join threads
-    task_queue.set_finished();
-    for (auto& t : threads) {
-        if (t.joinable()) t.join();
-    }
-
-    ui::detail("scanned " + ui::plural(scanned, "file") + ", hashed " + std::to_string(hashed)
-               + " using " + ui::plural(num_threads, "thread"));
+    ui::detail("scanned " + ui::plural(candidates.size(), "file") + ", found " +
+               ui::plural(groups.size(), "duplicate group"));
     ui::summary((ctx.dry_run ? "Would move " : "Moved ") + ui::plural(moved, "duplicate")
                 + " (" + ui::humanSize(reclaimed) + ")");
     return 0;

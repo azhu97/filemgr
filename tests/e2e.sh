@@ -109,6 +109,30 @@ check "undo reverses last watch batch" [ -f "$DL/big.pdf" ]
 "$BIN" --path "$DL" watch --print-plist | plutil -lint - >/dev/null
 check "printed plist is valid"        [ $? -eq 0 ]
 
+# --- stats ------------------------------------------------------------------
+fresh
+echo same > "$DL/a.txt"; echo same > "$DL/b.txt"; touch "$DL/c.png"
+before="$(find "$DL" | sort)"
+out="$(run stats)"
+check "stats changes nothing"         [ "$before" = "$(find "$DL" | sort)" ]
+echo "$out" | grep -q "1 duplicate copy wasting"; check "stats reports duplicates" [ $? -eq 0 ]
+echo "$out" | grep -q "3 unsorted files";         check "stats reports unsorted"   [ $? -eq 0 ]
+run stats --html "$WORK/report.html" >/dev/null
+check "stats writes html report"      [ -s "$WORK/report.html" ]
+run history | grep -q "stats";        check "stats is not journaled" [ $? -ne 0 ]
+
+# --- find -------------------------------------------------------------------
+fresh
+mkdir -p "$DL/PROTECTED" "$DL/.git"
+head -c 2048 /dev/zero > "$DL/big.bin"; echo x > "$DL/Report-final.pdf"; echo x > "$DL/PROTECTED/tax-report.pdf"
+echo x > "$DL/.git/report.txt"; touch -t 202001010000 "$DL/big.bin"
+[ "$(run find report --paths | wc -l | tr -d ' ')" = "2" ]; check "find matches names across folders" [ $? -eq 0 ]
+run find --larger 1K --paths | grep -q big.bin;           check "find --larger"   [ $? -eq 0 ]
+[ -z "$(run find --older 1y --smaller 1K --paths)" ];      check "find combines filters" [ $? -eq 0 ]
+run find report --hidden --paths | grep -q ".git/report"; check "find --hidden"   [ $? -eq 0 ]
+run find zzz >/dev/null;                                   check "find no match exits 1" [ $? -eq 1 ]
+run find --larger lots >/dev/null 2>&1;                    check "find bad size exits 2" [ $? -eq 2 ]
+
 # --- quiet ------------------------------------------------------------------
 fresh; touch "$DL/x.png"
 out="$(run -q sort)"

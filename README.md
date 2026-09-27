@@ -26,6 +26,8 @@ Requires macOS and the Xcode command line tools (`xcode-select --install`).
 | `dedup [--near]`   | Move byte-identical duplicates into `DUPLICATES/`, keeping the oldest copy. `--near` also moves visually similar images (resized, re-compressed, converted) into `DUPLICATES/NEAR/`; tune with `--threshold N` |
 | `old [days]`       | Archive files untouched for `days`+ days into `OLD/` (default 30) |
 | `upload <folder>`  | Upload a folder to Google Drive via `rclone` (`--remote NAME` to pick a remote) |
+| `stats`            | Disk usage by type, folder and age; largest files; duplicate waste and other cleanup opportunities. `--html FILE` writes a standalone report page |
+| `find [pattern]`   | Search by name, `--type`, `--ext`, `--larger`/`--smaller` size, `--older`/`--newer` age (read-only) |
 | `watch`            | Sort new files automatically as they land (runs until Ctrl-C; see below) |
 | `history [id]`     | List recent runs, or every move made by run `id` (`--limit N`) |
 | `undo [id]`        | Reverse the last run (or run `id`), moving files back where they came from |
@@ -93,6 +95,42 @@ filemgr undo 12          # reverse a specific run
 If a file has since been moved or deleted it is skipped with a warning, and if
 its original name has been taken the file is restored as `name_1.ext`.
 
+## Reports with `stats`
+
+`filemgr stats` is read-only. It shows where the space goes and which filemgr
+commands would reclaim it:
+
+```
+By type
+  VIDEOS       ████████████████████████     1.5 GB  47%  3 files
+  INSTALLERS   ████████████████████▊        1.3 GB  40%  2 files
+  ...
+Cleanup opportunities
+  33 duplicate copies wasting 137.1 MB   filemgr dedup
+  14 files untouched for 30+ days (2.3 GB)   filemgr old
+  4 unsorted files at the top level   filemgr sort
+```
+
+`filemgr stats --html report.html` writes the same report as a single
+self-contained HTML page with charts, tables and dark mode. `--top N` sets how
+many large files to list, and `--no-dups` skips the duplicate scan on very
+large folders.
+
+## Searching with `find`
+
+```sh
+filemgr find invoice                       # name contains "invoice" (case-insensitive)
+filemgr find "IMG_*.heic" --older 6m       # glob + last modified over 6 months ago
+filemgr find --type VIDEOS --larger 500M --sort size
+filemgr find --ext dmg,pkg --in INSTALLERS
+filemgr find --older 1y --print0 | xargs -0 open -R    # reveal matches in Finder
+```
+
+Sizes take `K`/`M`/`G`/`T` suffixes. Ages take `h`/`d`/`w`/`m`/`y`, and a bare
+number means days. `find` searches everything under the managed folder,
+including your own folders, because it never changes anything. It exits with
+status 1 when nothing matches.
+
 ## Automatic sorting with `watch`
 
 `filemgr watch` stays running and sorts each new file into its type folder as
@@ -152,8 +190,10 @@ filemgr/
 │   ├── cli.hpp           Argument parser (options, positionals, help formatting)
 │   ├── config.hpp        Config file format, defaults and loader
 │   ├── context.hpp       Context: managed root, config, journal, run-wide flags
+│   ├── duplicates.hpp    Exact-duplicate search shared by dedup and stats
 │   ├── file_config.hpp   config command
 │   ├── file_dedup.hpp
+│   ├── file_find.hpp     find command options
 │   ├── file_history.hpp  history / undo commands
 │   ├── file_near.hpp     dedup --near pass and its thresholds
 │   ├── file_old.hpp
@@ -161,16 +201,20 @@ filemgr/
 │   ├── file_recent.hpp
 │   ├── file_upload.hpp
 │   ├── file_watch.hpp    watch command and launchd plist generation
+│   ├── filter.hpp        FileFilter + size/age parsing (shared by find and rules)
 │   ├── image_hash.hpp    Perceptual image fingerprints (dHash + color grid)
 │   ├── journal.hpp       Append-only move journal (runs, moves, undo markers)
+│   ├── stats.hpp         Folder statistics model and stats/HTML entry points
 │   ├── ui.hpp            Colored, leveled, thread-safe terminal output
 │   └── utils.hpp         Shared helpers: safeMove, hashing, allowed-location check
 ├── src/                  Implementation, one file per module
 │   ├── cli.cpp
 │   ├── config.cpp        Built-in categories and INI parser
+│   ├── duplicates.cpp    Size bucketing + parallel SHA-256 grouping
 │   ├── file_config.cpp   config show/path/init/edit
 │   ├── main.cpp          Command table, global options, dispatch
-│   ├── file_dedup.cpp    dedup: size pre-filter + parallel SHA-256
+│   ├── file_dedup.cpp    dedup: keeps oldest copy of each duplicate group
+│   ├── file_find.cpp     find: filtered, sorted listing
 │   ├── file_history.cpp  history listing and undo
 │   ├── file_near.cpp     Near-duplicate grouping, keeps highest-resolution copy
 │   ├── file_old.cpp      old: archive stale files into OLD/
@@ -178,8 +222,11 @@ filemgr/
 │   ├── file_recent.cpp   recent: surface recently modified files
 │   ├── file_upload.cpp   upload: rclone wrapper (spawned without a shell)
 │   ├── file_watch.cpp    FSEvents stream, settle/debounce logic, lock file
+│   ├── filter.cpp
 │   ├── image_hash.cpp    ImageIO decoding + hashing
 │   ├── journal.cpp
+│   ├── report_html.cpp   Self-contained HTML report renderer
+│   ├── stats.cpp         stats collection and terminal rendering
 │   ├── ui.cpp
 │   └── utils.cpp
 └── tests/
@@ -189,7 +236,9 @@ filemgr/
     ├── test_config.cpp   Config loading and validation
     ├── test_utils.cpp    safeMove, journal, hashing, allowed locations
     ├── test_commands.cpp sort/dedup/old/recent/undo on fake folders
+    ├── test_filter.cpp   Size/age parsing and filter matching
     ├── test_near.cpp     Perceptual hashing on generated images
+    ├── test_stats.cpp    Stats collection and HTML escaping
     └── e2e.sh            End-to-end tests of the built binary
 ```
 
