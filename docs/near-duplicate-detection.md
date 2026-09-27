@@ -1,5 +1,9 @@
 # Near-Duplicate Detection
 
+> **Status: implemented** in `feature/near-duplicate-detection`. See
+> [Implementation notes](#implementation-notes) at the end for how the open
+> questions were resolved and where the implementation departs from this plan.
+
 ## Problem
 
 `dedup` (`src/file_dedup.cpp`) only catches byte-identical files via SHA-256. It misses the far more common real-world case: the same photo saved twice at different resolutions or JPEG quality, a screenshot re-compressed by Slack/Discord, or a document re-exported from the same source. These have different bytes and different hashes, so they pile up untouched.
@@ -39,3 +43,68 @@ Extend `dedup` to also flag *near*-duplicate images: visually similar files that
 - Non-image near-duplicates (documents, audio, video).
 - A GUI/preview step before moving files (the "move to DUPLICATES/NEAR for review" step is the safety net instead).
 - Locality-sensitive hashing / bucketing for scaling to huge file counts — a Downloads folder is small enough that O(n²) hash comparisons are fine to start; revisit only if it's actually slow.
+
+## Implementation notes
+
+**Usage:** `filemgr dedup --near [--threshold N]` (default `N = 6`). Near-duplicates
+move to `DUPLICATES/NEAR/` and, like every move, are recorded in the journal,
+so `filemgr undo` reverses them.
+
+**Files:** `include/image_hash.hpp` / `src/image_hash.cpp` (fingerprinting),
+`include/file_near.hpp` / `src/file_near.cpp` (the pass itself), `tests/test_near.cpp`.
+
+### Departures from the plan
+
+- **ImageIO instead of `stb_image.h`.** stb cannot decode HEIC, which is the
+  default format for iPhone photos and so a large share of a Mac user's
+  Downloads. The system ImageIO framework decodes HEIC, WebP, AVIF, TIFF, JPEG,
+  PNG and GIF with nothing vendored, and its thumbnail API
+  (`CGImageSourceCreateThumbnailAtIndex`) avoids fully decoding large photos.
+  The build still stays a single compiler invocation. It just links two more
+  system frameworks (`CoreGraphics`, `ImageIO`).
+- **A color signature alongside dHash.** Testing against the system wallpapers
+  showed that dHash alone matched *recolored* variants of one image (the iMac
+  Blue/Green/Pink wallpapers came out at Hamming distance 2-3), because it only
+  sees grayscale structure. Each fingerprint now also stores a 4x4 grid of
+  average RGB values, and a pair must pass both checks: Hamming distance
+  <= threshold **and** mean color difference <= 16/255.
+
+### Threshold tuning (open question 1)
+
+Measured against a 6K HEIC wallpaper:
+
+| Variant                          | Hamming | Color |
+|----------------------------------|--------:|------:|
+| Resized to 800px, JPEG q=40      | 1       | 0     |
+| Resized to 300px PNG             | 2       | 0     |
+| JPEG quality 5                   | 1       | 0     |
+| 5% center crop                   | 4       | 2     |
+| 15% center crop                  | 12      | 11    |
+| Rotated 90°                      | 38      | 15    |
+| Same wallpaper, different color  | 2-3     | 40-72 |
+| Unrelated wallpaper              | 30-32   | 25-116 |
+
+A default of 6 catches re-encodes, resizes and light crops, and rejects
+heavier crops and rotations. Burst shots of a moving subject usually land at
+8+. `--threshold` lets users trade recall for precision.
+
+### Which copy to keep (open question 2)
+
+Unlike exact dedup, the keeper is the **highest-resolution** copy (most
+pixels), then the largest file, then the oldest. For near-duplicates the
+typical pair is an original and a compressed re-export, so "oldest wins"
+would often keep the worse copy.
+
+### Grouping
+
+Images are sorted best-first and compared only against already-kept images,
+never against other duplicates. This avoids chaining, where A~B and B~C would
+put A and C in one group even though A and C differ.
+
+### CLI surface (open question 3)
+
+A flag on `dedup` (`--near`), as leaned towards. The exact pass always runs
+first, so byte-identical copies are handled by the zero-false-positive path.
+Files in `DUPLICATES/` (including `NEAR/`) are ignored by both passes, so
+re-running is idempotent. Flat or blank images (hash 0) are skipped because
+they would match each other trivially.

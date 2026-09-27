@@ -23,7 +23,7 @@ Requires macOS and the Xcode command line tools (`xcode-select --install`).
 |--------------------|----------------------------------------------------------------|
 | `sort`             | Move top-level files into type folders (`IMAGES`, `DOCUMENTS`, ...) |
 | `recent [n]`       | Bring the `n` most recently modified files back to the top level (default 5) |
-| `dedup`            | Move byte-identical duplicates into `DUPLICATES/`, keeping the oldest copy |
+| `dedup [--near]`   | Move byte-identical duplicates into `DUPLICATES/`, keeping the oldest copy. `--near` also moves visually similar images (resized, re-compressed, converted) into `DUPLICATES/NEAR/`; tune with `--threshold N` |
 | `old [days]`       | Archive files untouched for `days`+ days into `OLD/` (default 30) |
 | `upload <folder>`  | Upload a folder to Google Drive via `rclone` (`--remote NAME` to pick a remote) |
 | `history [id]`     | List recent runs, or every move made by run `id` (`--limit N`) |
@@ -121,10 +121,12 @@ filemgr/
 │   ├── file_config.hpp   config command
 │   ├── file_dedup.hpp
 │   ├── file_history.hpp  history / undo commands
+│   ├── file_near.hpp     dedup --near pass and its thresholds
 │   ├── file_old.hpp
 │   ├── file_ops.hpp
 │   ├── file_recent.hpp
 │   ├── file_upload.hpp
+│   ├── image_hash.hpp    Perceptual image fingerprints (dHash + color grid)
 │   ├── journal.hpp       Append-only move journal (runs, moves, undo markers)
 │   ├── ui.hpp            Colored, leveled, thread-safe terminal output
 │   └── utils.hpp         Shared helpers: safeMove, hashing, allowed-location check
@@ -135,10 +137,12 @@ filemgr/
 │   ├── main.cpp          Command table, global options, dispatch
 │   ├── file_dedup.cpp    dedup: size pre-filter + parallel SHA-256
 │   ├── file_history.cpp  history listing and undo
+│   ├── file_near.cpp     Near-duplicate grouping, keeps highest-resolution copy
 │   ├── file_old.cpp      old: archive stale files into OLD/
 │   ├── file_ops.cpp      sort: move files into type folders
 │   ├── file_recent.cpp   recent: surface recently modified files
 │   ├── file_upload.cpp   upload: rclone wrapper (spawned without a shell)
+│   ├── image_hash.cpp    ImageIO decoding + hashing
 │   ├── journal.cpp
 │   ├── ui.cpp
 │   └── utils.cpp
@@ -149,6 +153,7 @@ filemgr/
     ├── test_config.cpp   Config loading and validation
     ├── test_utils.cpp    safeMove, journal, hashing, allowed locations
     ├── test_commands.cpp sort/dedup/old/recent/undo on fake folders
+    ├── test_near.cpp     Perceptual hashing on generated images
     └── e2e.sh            End-to-end tests of the built binary
 ```
 
