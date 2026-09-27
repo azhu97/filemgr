@@ -1,0 +1,8 @@
+# Build output
+/build/
+/filemgr
+*.o
+*.d
+
+# macOS
+.DS_Store
