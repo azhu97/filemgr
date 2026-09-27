@@ -36,6 +36,11 @@ fs::path uniqueDestination(const fs::path& dest_dir, const fs::path& filename);
 // Returns the final path, or an empty path on failure (error already reported).
 fs::path safeMove(const Context& ctx, const fs::path& src, const fs::path& dest_dir);
 
+// Like safeMove, but moves src to `desired` (a full path), choosing a unique
+// variant of desired's filename if it is taken. Used by undo to restore
+// original names.
+fs::path safeMoveTo(const Context& ctx, const fs::path& src, const fs::path& desired);
+
 // Lower-cased copy of a file's extension, e.g. "photo.JPG" -> ".jpg".
 std::string lowerExtension(const fs::path& file_path);
 
