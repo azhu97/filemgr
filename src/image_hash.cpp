@@ -3,6 +3,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include <ImageIO/ImageIO.h>
+#include <cstdlib>
 #include <unordered_set>
 
 namespace {
@@ -37,6 +38,14 @@ bool isImageFile(const fs::path& file_path) {
 
 int hammingDistance(std::uint64_t a, std::uint64_t b) {
     return __builtin_popcountll(a ^ b);
+}
+
+int colorDistance(const ImageFingerprint& a, const ImageFingerprint& b) {
+    int total = 0;
+    for (std::size_t i = 0; i < a.color.size(); ++i) {
+        total += std::abs(int(a.color[i]) - int(b.color[i]));
+    }
+    return total / static_cast<int>(a.color.size());
 }
 
 ImageFingerprint computePerceptualHash(const fs::path& file_path) {
@@ -82,6 +91,21 @@ ImageFingerprint computePerceptualHash(const fs::path& file_path) {
     CGContextFillRect(ctx, CGRectMake(0, 0, W, H));
     CGContextSetInterpolationQuality(ctx, kCGInterpolationHigh);
     CGContextDrawImage(ctx, CGRectMake(0, 0, W, H), image);
+
+    // Coarse color signature: 4x4 RGB, again on white.
+    constexpr int C = 4;
+    unsigned char rgba[C * C * 4] = {};
+    CFHolder<CGColorSpaceRef> rgb(CGColorSpaceCreateDeviceRGB());
+    CFHolder<CGContextRef> color_ctx(CGBitmapContextCreate(rgba, C, C, 8, C * 4, rgb,
+                                                           kCGImageAlphaNoneSkipLast));
+    if (!color_ctx) return result;
+    CGContextSetRGBFillColor(color_ctx, 1.0, 1.0, 1.0, 1.0);
+    CGContextFillRect(color_ctx, CGRectMake(0, 0, C, C));
+    CGContextSetInterpolationQuality(color_ctx, kCGInterpolationHigh);
+    CGContextDrawImage(color_ctx, CGRectMake(0, 0, C, C), image);
+    for (int i = 0; i < C * C; ++i) {
+        for (int ch = 0; ch < 3; ++ch) result.color[i * 3 + ch] = rgba[i * 4 + ch];
+    }
 
     std::uint64_t hash = 0;
     for (int y = 0; y < H; ++y) {

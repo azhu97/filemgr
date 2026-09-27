@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstdint>
 #include <filesystem>
 
@@ -10,7 +11,8 @@ namespace fs = std::filesystem;
 
 struct ImageFingerprint {
     bool ok = false;        // false if the file could not be decoded
-    std::uint64_t hash = 0; // 64-bit dHash
+    std::uint64_t hash = 0; // 64-bit dHash (grayscale structure)
+    std::array<std::uint8_t, 48> color{}; // 4x4 grid of average RGB values
     int width = 0;          // Original pixel dimensions
     int height = 0;
 };
@@ -22,6 +24,10 @@ ImageFingerprint computePerceptualHash(const fs::path& file_path);
 
 // Number of differing bits between two hashes (0 = visually identical).
 int hammingDistance(std::uint64_t a, std::uint64_t b);
+
+// Mean absolute difference between two color grids, 0-255. dHash ignores
+// color, so this is what tells a recolored variant apart from a re-encoded copy.
+int colorDistance(const ImageFingerprint& a, const ImageFingerprint& b);
 
 // True for extensions ImageIO can decode.
 bool isImageFile(const fs::path& file_path);
