@@ -5,6 +5,17 @@ merged into `main`.
 
 ## Unreleased
 
+### Watch daemon (`feature/watch-daemon`)
+- New `watch` command sorts new files as they arrive, using FSEvents.
+  Waits for files to settle (`--settle`, default 2s, plus a size-stability
+  check) and ignores partial downloads (`.crdownload`, `.part`, ...).
+- `--sort-existing` sorts the current contents at startup.
+- Single-instance lock (`~/.filemgr/watch.lock`); clean shutdown on SIGINT/SIGTERM.
+- Each sorted batch is a journal run, so `undo` works on watch activity.
+- `--print-plist` generates a launchd agent; a template is in `launchd/`.
+- `sort` logic refactored into `sortOneFile()`, shared with `watch`.
+- Build now links `CoreServices`.
+
 ### Near-duplicate detection (`feature/near-duplicate-detection`)
 - `dedup --near` finds visually similar images (resized, re-compressed or
   format-converted copies) and moves them into `DUPLICATES/NEAR/`, keeping the
