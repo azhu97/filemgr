@@ -13,6 +13,7 @@
 #include "file_dedup.hpp"
 #include "file_near.hpp"
 #include "file_watch.hpp"
+#include "stats.hpp"
 #include "file_old.hpp"
 #include "file_upload.hpp"
 #include "file_history.hpp"
@@ -120,6 +121,14 @@ const std::vector<Command>& commands() {
                      throw UsageError("--settle must be a number of seconds between 0 and 3600");
              }
              return watchDownloads(ctx, options);
+         }},
+        {"stats", "", "Report disk usage by type, folder and age, plus cleanup opportunities",
+         {{"top", 0, "N", "Number of largest files to list (default 10)"},
+          {"no-dups", 0, "", "Skip the duplicate scan (faster on huge folders)"},
+          {"html", 0, "FILE", "Write a standalone HTML report to FILE instead"}},
+         false, true,
+         [](const Context& ctx, const ParsedArgs& a) {
+             return showStats(ctx, parseCount(a.get("top", "10"), "--top"), !a.has("no-dups"), a.get("html"));
          }},
         {"history", "[id]", "List recent runs, or every move made by run <id>",
          {{"limit", 'l', "N", "Number of runs to list (default 15)"}}, false, false,

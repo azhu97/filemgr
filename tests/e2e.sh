@@ -109,6 +109,18 @@ check "undo reverses last watch batch" [ -f "$DL/big.pdf" ]
 "$BIN" --path "$DL" watch --print-plist | plutil -lint - >/dev/null
 check "printed plist is valid"        [ $? -eq 0 ]
 
+# --- stats ------------------------------------------------------------------
+fresh
+echo same > "$DL/a.txt"; echo same > "$DL/b.txt"; touch "$DL/c.png"
+before="$(find "$DL" | sort)"
+out="$(run stats)"
+check "stats changes nothing"         [ "$before" = "$(find "$DL" | sort)" ]
+echo "$out" | grep -q "1 duplicate copy wasting"; check "stats reports duplicates" [ $? -eq 0 ]
+echo "$out" | grep -q "3 unsorted files";         check "stats reports unsorted"   [ $? -eq 0 ]
+run stats --html "$WORK/report.html" >/dev/null
+check "stats writes html report"      [ -s "$WORK/report.html" ]
+run history | grep -q "stats";        check "stats is not journaled" [ $? -ne 0 ]
+
 # --- quiet ------------------------------------------------------------------
 fresh; touch "$DL/x.png"
 out="$(run -q sort)"
