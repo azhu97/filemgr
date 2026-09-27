@@ -8,12 +8,27 @@ files, and upload folders to Google Drive.
 
 ```sh
 make                 # builds ./filemgr
-make install         # installs to ~/.local/bin/filemgr (override with PREFIX=...)
+make install         # binary, man page and shell completions under ~/.local (override with PREFIX=...)
 make test            # unit + end-to-end tests (never touch your real Downloads)
 ```
 
 Make sure `~/.local/bin` is on your `PATH`, or install system-wide with
-`sudo make install PREFIX=/usr/local`.
+`sudo make install PREFIX=/usr/local` (Homebrew's zsh, bash-completion and fish
+pick up completions from there automatically).
+
+With the default `~/.local` prefix, point your shell at the installed completions:
+
+```sh
+# zsh (~/.zshrc, before compinit)
+fpath=(~/.local/share/zsh/site-functions $fpath)
+# bash (~/.bashrc)
+source ~/.local/share/bash-completion/completions/filemgr
+# fish: ~/.local/share/fish/vendor_completions.d is not searched by default
+filemgr completions fish > ~/.config/fish/completions/filemgr.fish
+```
+
+`man filemgr` works once `~/.local/share/man` is on your `MANPATH` (or use
+`man ./man/filemgr.1` from the repo).
 
 Requires macOS and the Xcode command line tools (`xcode-select --install`).
 
@@ -33,6 +48,7 @@ Requires macOS and the Xcode command line tools (`xcode-select --install`).
 | `history [id]`     | List recent runs, or every move made by run `id` (`--limit N`) |
 | `undo [id]`        | Reverse the last run (or run `id`), moving files back where they came from |
 | `config [action]`  | `show` the effective config, print its `path`, `init` a starter file, or `edit` it |
+| `completions <shell>` | Print a completion script for `zsh`, `bash` or `fish` |
 | `help [command]`   | Show usage, or detailed help for one command                   |
 
 ### Global options
@@ -225,7 +241,9 @@ invisible to it and never manipulated — put files there to keep them safe.
 
 ```
 filemgr/
-├── Makefile              Build, install and clean targets
+├── .github/workflows/
+│   └── ci.yml            CI on macOS: -Werror build, tests, man lint, install
+├── Makefile              Build, test, install (binary, man page, completions)
 ├── README.md             This file
 ├── CHANGELOG.md          Notable changes per feature
 ├── docs/                 Design documents for larger features
@@ -233,8 +251,12 @@ filemgr/
 │   └── watch-daemon.md
 ├── launchd/
 │   └── com.filemgr.watch.plist  launchd agent template for `watch`
+├── man/
+│   └── filemgr.1         Man page
 ├── include/              Public headers, one per module
 │   ├── cli.hpp           Argument parser (options, positionals, help formatting)
+│   ├── commands.hpp      Command table: names, options, handlers (drives help + completions)
+│   ├── completions.hpp   Shell completion generator
 │   ├── config.hpp        Config file format, defaults, rules and loader
 │   ├── context.hpp       Context: managed root, config, journal, run-wide flags
 │   ├── duplicates.hpp    Exact-duplicate search shared by dedup and stats
@@ -257,11 +279,13 @@ filemgr/
 │   └── utils.hpp         Shared helpers: safeMove, hashing, allowed-location check
 ├── src/                  Implementation, one file per module
 │   ├── cli.cpp
+│   ├── commands.cpp      Every subcommand registered in one table
+│   ├── completions.cpp   zsh/bash/fish script generation
 │   ├── config.cpp        Built-in categories and INI parser
 │   ├── duplicates.cpp    Size bucketing + parallel SHA-256 grouping
 │   ├── file_clean.cpp    Rule planning (first match wins) and trash/move actions
 │   ├── file_config.cpp   config show/path/init/edit
-│   ├── main.cpp          Command table, global options, dispatch
+│   ├── main.cpp          Context setup (root, config, journal) and dispatch
 │   ├── file_dedup.cpp    dedup: keeps oldest copy of each duplicate group
 │   ├── file_find.cpp     find: filtered, sorted listing
 │   ├── file_history.cpp  history listing and undo
@@ -289,7 +313,7 @@ filemgr/
     ├── test_near.cpp     Perceptual hashing on generated images
     ├── test_rules.cpp    Rule parsing/validation and clean + undo
     ├── test_stats.cpp    Stats collection and HTML escaping
-    └── e2e.sh            End-to-end tests of the built binary
+    └── e2e.sh            End-to-end tests of the built binary (incl. completions, docs coverage)
 ```
 
 Build output goes to `build/` (objects) and `./filemgr` (binary); both are git-ignored.
@@ -300,7 +324,9 @@ Build output goes to `build/` (objects) and `./filemgr` (binary); both are git-i
 2. Implement it in `src/file_<name>.cpp`. Move files only through `safeMove()`
    so dry runs (and the undo journal) work automatically, and gate any recursive
    scan with `isInAllowedLocation()` so user folders stay untouched.
-3. Register it in the command table in `src/main.cpp`, with `journaled = true`
-   if it moves files.
+3. Register it in the command table in `src/commands.cpp`, with `journaled = true`
+   if it moves files. Help text and shell completions pick it up automatically.
+   Document it in `man/filemgr.1` and this README, because `make test` fails
+   if either is missing a command.
 4. Add tests in `tests/test_commands.cpp` (and `tests/e2e.sh` for CLI
    behaviour), then run `make test`. Run a subset with `build/unit_tests <name-filter>`.

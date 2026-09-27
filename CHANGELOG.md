@@ -5,6 +5,17 @@ merged into `main`.
 
 ## Unreleased
 
+### Shell integration (`feature/shell-integration`)
+- `completions zsh|bash|fish` prints completion scripts generated from the
+  command table; rule names for `clean` complete live (`clean --names`).
+- `man/filemgr.1` man page.
+- `make install` now installs the man page and all three completion scripts;
+  `make uninstall` removes them.
+- GitHub Actions CI on macOS: `-Werror` build, full test suite, man page lint,
+  and an install smoke test.
+- The command table moved from `main.cpp` to `commands.{hpp,cpp}`.
+- `make test` fails if a command is missing from the man page or README.
+
 ### Rules engine (`feature/rules-engine`)
 - `[rule "Name"]` sections in the config: conditions `match`, `ext`, `type`,
   `larger`, `smaller`, `older`, `newer`, `in`, plus `action = trash | move FOLDER`
