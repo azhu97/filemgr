@@ -15,6 +15,8 @@
 #include "file_upload.hpp"
 #include "file_history.hpp"
 #include "journal.hpp"
+#include "config.hpp"
+#include "file_config.hpp"
 
 #ifndef FILEMGR_VERSION
 #define FILEMGR_VERSION "2.0.0-dev"
@@ -28,11 +30,13 @@ struct Command {
     std::string summary;
     std::vector<OptionSpec> options;
     bool journaled;        // Moves are recorded so the run can be undone
+    bool needs_root;       // Requires the managed folder to exist
     std::function<int(const Context&, const ParsedArgs&)> run;
 };
 
 const std::vector<OptionSpec> kGlobalOptions = {
-    {"path", 'p', "DIR", "Manage DIR instead of ~/Downloads (or $FILEMGR_ROOT)"},
+    {"path", 'p', "DIR", "Manage DIR instead of ~/Downloads"},
+    {"config", 'c', "FILE", "Read configuration from FILE"},
     {"dry-run", 'n', "", "Show what would happen without changing anything"},
     {"verbose", 'v', "", "Print extra detail"},
     {"quiet", 'q', "", "Only print errors and the final summary"},
@@ -47,36 +51,59 @@ std::string positional(const ParsedArgs& args, size_t i, const std::string& fall
     return i < args.positionals.size() ? args.positionals[i] : fallback;
 }
 
+fs::path configPath(const ParsedArgs& args) {
+    return args.has("config") ? expandHome(args.get("config")) : defaultConfigPath();
+}
+
+// Managed folder precedence: --path, then $FILEMGR_ROOT, then config root, then ~/Downloads.
+fs::path resolveRoot(const ParsedArgs& args, const Config& config) {
+    fs::path root;
+    if (args.has("path")) root = expandHome(args.get("path"));
+    else if (const char* env = getenv("FILEMGR_ROOT"); env && *env) root = env;
+    else if (!config.root.empty()) root = config.root;
+    else root = downloadPath();
+    root = fs::absolute(root).lexically_normal();
+    if (root.filename().empty()) root = root.parent_path(); // drop trailing slash
+    return root;
+}
+
 const std::vector<Command>& commands() {
     static const std::vector<Command> table = {
-        {"sort", "", "Move top-level files into type folders (IMAGES, DOCUMENTS, ...)", {}, true,
+        {"sort", "", "Move top-level files into type folders (IMAGES, DOCUMENTS, ...)", {}, true, true,
          [](const Context& ctx, const ParsedArgs&) { return sortByType(ctx); }},
-        {"recent", "[n]", "Bring the n most recently modified files back to the top level (default 5)", {}, true,
+        {"recent", "[n]", "Bring the n most recently modified files back to the top level (default 5, see config)", {}, true, true,
          [](const Context& ctx, const ParsedArgs& a) {
-             return recentFile(ctx, parseCount(positional(a, 0, "5"), "n"));
+             std::string fallback = std::to_string(ctx.config->recent_count);
+             return recentFile(ctx, parseCount(positional(a, 0, fallback), "n"));
          }},
-        {"dedup", "", "Move byte-identical duplicates into DUPLICATES/, keeping the oldest copy", {}, true,
+        {"dedup", "", "Move byte-identical duplicates into DUPLICATES/, keeping the oldest copy", {}, true, true,
          [](const Context& ctx, const ParsedArgs&) { return deduplicateFiles(ctx); }},
-        {"old", "[days]", "Archive files untouched for this many days into OLD/ (default 30)", {}, true,
+        {"old", "[days]", "Archive files untouched for this many days into OLD/ (default 30, see config)", {}, true, true,
          [](const Context& ctx, const ParsedArgs& a) {
-             return archiveOld(ctx, parseCount(positional(a, 0, "30"), "days"));
+             std::string fallback = std::to_string(ctx.config->old_days);
+             return archiveOld(ctx, parseCount(positional(a, 0, fallback), "days"));
          }},
         {"upload", "<folder>", "Upload a folder to Google Drive via rclone",
-         {{"remote", 'r', "NAME", "rclone remote to upload to (default: gdrive)"}}, false,
+         {{"remote", 'r', "NAME", "rclone remote to upload to (default from config: gdrive)"}}, false, true,
          [](const Context& ctx, const ParsedArgs& a) {
              if (a.positionals.empty()) throw UsageError("upload requires a folder name");
-             return uploadFolder(ctx, a.positionals[0], a.get("remote", "gdrive"));
+             return uploadFolder(ctx, a.positionals[0], a.get("remote", ctx.config->remote));
          }},
         {"history", "[id]", "List recent runs, or every move made by run <id>",
-         {{"limit", 'l', "N", "Number of runs to list (default 15)"}}, false,
+         {{"limit", 'l', "N", "Number of runs to list (default 15)"}}, false, false,
          [](const Context&, const ParsedArgs& a) {
              Journal journal(stateDirectory() / "journal");
              return showHistory(journal, parseCount(a.get("limit", "15"), "--limit"),
                                 parseCount(positional(a, 0, "0"), "id"));
          }},
-        {"undo", "[id]", "Reverse the last run (or run <id>), moving files back", {}, true,
+        {"undo", "[id]", "Reverse the last run (or run <id>), moving files back", {}, true, false,
          [](const Context& ctx, const ParsedArgs& a) {
              return undoRun(ctx, parseCount(positional(a, 0, "0"), "id"));
+         }},
+        {"config", "[show|path|init|edit]", "Show the effective configuration, or create/edit the config file",
+         {{"force", 'f', "", "With init: overwrite an existing config file"}}, false, false,
+         [](const Context& ctx, const ParsedArgs& a) {
+             return configCommand(*ctx.config, configPath(a), positional(a, 0, "show"), a.has("force"));
          }},
     };
     return table;
@@ -168,9 +195,12 @@ int main(int argc, char* argv[]) {
 
     int status = 0;
     try {
+        Config config = loadConfig(configPath(args));
+        filemgr_directories = config.managedFolders();
+
         Context ctx;
-        ctx.root = fs::absolute(args.has("path") ? fs::path(args.get("path")) : downloadPath()).lexically_normal();
-        if (ctx.root.filename().empty()) ctx.root = ctx.root.parent_path(); // drop trailing slash
+        ctx.config = &config;
+        ctx.root = resolveRoot(args, config);
         ctx.dry_run = args.has("dry-run");
 
         // Journal every mutating command so it can be undone later. undo is
@@ -184,7 +214,7 @@ int main(int argc, char* argv[]) {
             ctx.journal = journal.get();
         }
 
-        if (!fs::is_directory(ctx.root)) {
+        if (command->needs_root && !fs::is_directory(ctx.root)) {
             ui::error(ctx.root.string() + " is not a directory");
             return 1;
         }
@@ -196,6 +226,9 @@ int main(int argc, char* argv[]) {
         ui::error(e.what());
         std::cerr << "Run 'filemgr " << command->name << " --help' for usage.\n";
         return 2;
+    } catch (const ConfigError& e) {
+        ui::error(std::string("in config: ") + e.what());
+        return 1;
     } catch (const std::exception& e) {
         ui::error(e.what());
         return 1;
