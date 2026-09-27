@@ -11,29 +11,16 @@ void emptyOldDirectory() {
     }
     
     for (const auto& entry : fs::directory_iterator(old_path)) {
-        fs::path dest = fs::path(download_path) / entry.path().filename();
-        
-        // Handle filename collisions
-        int counter = 1;
-        while (fs::exists(dest)) {
-            std::string stem = entry.path().stem().string();
-            std::string ext = entry.path().extension().string();
-            dest = fs::path(download_path) / (stem + "_" + std::to_string(counter) + ext);
-            counter++;
-        }
-        
-        try {
-            fs::rename(entry.path(), dest);
-            std::cout << "Moved from OLD: " << entry.path().filename() 
+        fs::path dest = safeMove(entry.path(), download_path);
+        if (!dest.empty()) {
+            std::cout << "Moved from OLD: " << entry.path().filename()
                       << " -> " << dest.filename() << "\n";
-        } catch (const fs::filesystem_error& e) {
-            std::cerr << "Error moving file from OLD: " << e.what() << "\n";
         }
     }
 }
 
 void archiveOld(int x) {
-    const long seconds_threshold = x * 60 * 60 * 24; // x days to seconds
+    const long long seconds_threshold = static_cast<long long>(x) * 60 * 60 * 24; // x days to seconds
     
     emptyOldDirectory();
     
@@ -61,27 +48,14 @@ void archiveOld(int x) {
         // Calculate file age
         auto file_time = fs::last_write_time(entry.path());
         auto age = std::chrono::duration_cast<std::chrono::seconds>(now - file_time);
-        long age_seconds = age.count();
+        long long age_seconds = age.count();
         
         // Archive if older than threshold
         if (age_seconds >= seconds_threshold) {
-            fs::path dest = old_path / entry.path().filename();
-            
-            // Handle filename collisions
-            int counter = 1;
-            while (fs::exists(dest)) {
-                std::string stem = entry.path().stem().string();
-                std::string ext = entry.path().extension().string();
-                dest = old_path / (stem + "_" + std::to_string(counter) + ext);
-                counter++;
-            }
-            
-            try {
-                fs::rename(entry.path(), dest);
-                std::cout << "Archived old file: " << entry.path().filename() 
+            fs::path dest = safeMove(entry.path(), old_path);
+            if (!dest.empty()) {
+                std::cout << "Archived old file: " << entry.path().filename()
                           << " -> OLD/" << dest.filename() << "\n";
-            } catch (const fs::filesystem_error& e) {
-                std::cerr << "Error archiving file: " << e.what() << "\n";
             }
         }
     }

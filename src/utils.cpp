@@ -1,4 +1,6 @@
 #include "utils.hpp"
+#include <algorithm>
+#include <cctype>
 
 
 namespace fs = std::filesystem;
@@ -56,33 +58,59 @@ std::string downloadPath() {
 }
 
 void putFileInDownload(const fs::path& file_path) {
-    // check if file is already in download path
-
-
-    std::string download_path = downloadPath();
-    fs::path dest = fs::path(download_path) / file_path.filename();
-
-    if (file_path == dest) {
+    fs::path download_path = downloadPath();
+    if (file_path.parent_path() == download_path) {
         std::cout << "File already in Downloads: " << file_path.filename() << "\n";
         return;
     }
 
-    // Handle filename collisions
-    int counter = 1;
-    while (fs::exists(dest)) {
-        std::string stem = file_path.stem().string();
-        std::string ext = file_path.extension().string();
-        dest = fs::path(download_path) / (stem + "_" + std::to_string(counter) + ext);
-        counter++;
-    }
-    
-    try {
-        fs::rename(file_path, dest);
-        std::cout << "Moved recent file: " << file_path.filename() 
+    fs::path dest = safeMove(file_path, download_path);
+    if (!dest.empty()) {
+        std::cout << "Moved recent file: " << file_path.filename()
                   << " -> " << dest.filename() << "\n";
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << "Error moving file: " << e.what() << "\n";
     }
 }
 
-// Create a threadsafe queue
+fs::path uniqueDestination(const fs::path& dest_dir, const fs::path& filename) {
+    fs::path dest = dest_dir / filename;
+    std::string stem = filename.stem().string();
+    std::string ext = filename.extension().string();
+    int counter = 1;
+    while (fs::exists(fs::symlink_status(dest))) {
+        dest = dest_dir / (stem + "_" + std::to_string(counter) + ext);
+        counter++;
+    }
+    return dest;
+}
+
+fs::path safeMove(const fs::path& src, const fs::path& dest_dir) {
+    std::error_code ec;
+    fs::create_directories(dest_dir, ec);
+    if (ec) {
+        std::cerr << "Error creating " << dest_dir << ": " << ec.message() << "\n";
+        return {};
+    }
+
+    fs::path dest = uniqueDestination(dest_dir, src.filename());
+    fs::rename(src, dest, ec);
+    if (ec == std::errc::cross_device_link) {
+        // Different volume: copy, then remove the original only if the copy succeeded.
+        ec.clear();
+        fs::copy(src, dest, fs::copy_options::recursive, ec);
+        if (!ec) {
+            fs::remove_all(src, ec);
+        }
+    }
+    if (ec) {
+        std::cerr << "Error moving " << src << ": " << ec.message() << "\n";
+        return {};
+    }
+    return dest;
+}
+
+std::string lowerExtension(const fs::path& file_path) {
+    std::string ext = file_path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return ext;
+}
