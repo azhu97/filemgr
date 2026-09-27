@@ -4,4 +4,4 @@
 #include <vector>
 #include <iostream>
 
-void recentFile(int x);
+int recentFile(const Context& ctx, int count);
