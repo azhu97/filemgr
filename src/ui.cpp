@@ -30,16 +30,22 @@ bool colorEnabled() { return g_color; }
 bool verbose() { return g_verbosity == Verbosity::Verbose; }
 
 void info(const std::string& message) {
-    if (g_verbosity != Verbosity::Quiet) print(std::cout, message);
+    if (g_verbosity >= Verbosity::Normal) print(std::cout, message);
 }
 
 void detail(const std::string& message) {
     if (g_verbosity == Verbosity::Verbose) print(std::cout, dim(message));
 }
 
-void warn(const std::string& message) { print(std::cerr, yellow("warning: ") + message); }
-void error(const std::string& message) { print(std::cerr, red("error: ") + message); }
-void summary(const std::string& message) { print(std::cout, bold(message)); }
+void warn(const std::string& message) {
+    if (g_verbosity != Verbosity::Silent) print(std::cerr, yellow("warning: ") + message);
+}
+void error(const std::string& message) {
+    if (g_verbosity != Verbosity::Silent) print(std::cerr, red("error: ") + message);
+}
+void summary(const std::string& message) {
+    if (g_verbosity != Verbosity::Silent) print(std::cout, bold(message));
+}
 
 void action(const std::string& verb, const std::string& from, const std::string& to) {
     info("  " + cyan(verb) + " " + from + dim(" -> ") + to);
