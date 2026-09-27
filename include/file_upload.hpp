@@ -5,4 +5,4 @@
 #include <iostream>
 #include <cstdlib>
 
-void uploadFolder(std::string folder_name);
+int uploadFolder(const Context& ctx, const std::string& folder_name, const std::string& remote);

@@ -2,9 +2,9 @@
 
 namespace fs = std::filesystem;
 
-void sortByType() {
-    std::string path = downloadPath();
-    std::cout << "Sorting files in: " << path << "\n";
+int sortByType(const Context& ctx) {
+    const fs::path& path = ctx.root;
+    ui::info("Sorting files in " + ui::bold(path.string()));
 
     // mapping for file extensions to directories
     std::map<std::string, std::string> typeMap = {
@@ -42,22 +42,26 @@ void sortByType() {
         {".ts", "CODE"}
     };
 
+    std::size_t moved = 0;
     for (const auto& entry : fs::directory_iterator(path)) {
-        if (!entry.is_regular_file()) {
-            continue; // skip non-regular files
+        if (!entry.is_regular_file() || isHidden(entry.path())) {
+            continue; // skip directories, symlinks to dirs, dotfiles
         }
 
         // Match extensions case-insensitively so photo.JPG sorts like photo.jpg
         auto it = typeMap.find(lowerExtension(entry.path()));
         if (it == typeMap.end()) {
+            ui::detail("  skip " + entry.path().filename().string() + " (unknown type)");
             continue;
         }
 
-        fs::path targetDir = fs::path(path) / it->second;
-        fs::path newPath = safeMove(entry.path(), targetDir);
+        fs::path newPath = safeMove(ctx, entry.path(), path / it->second);
         if (!newPath.empty()) {
-            std::cout << "Moved " << entry.path().filename().string()
-                      << " -> " << it->second << "/" << newPath.filename().string() << "\n";
+            ui::action("sort", entry.path().filename().string(), displayPath(ctx, newPath));
+            moved++;
         }
     }
+
+    ui::summary((ctx.dry_run ? "Would sort " : "Sorted ") + ui::plural(moved, "file"));
+    return 0;
 }

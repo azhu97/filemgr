@@ -5,7 +5,7 @@
 
 namespace fs = std::filesystem;
 
-bool isInAllowedLocation(const fs::path& file_path, std::string download_path) {
+bool isInAllowedLocation(const fs::path& file_path, const fs::path& download_path) {
     // Get the relative path from Downloads
     fs::path relative = fs::relative(file_path, download_path);
     
@@ -49,26 +49,15 @@ std::string computeFileHash(const fs::path& file_path) {
     return hash_str;
 }
 
-std::string downloadPath() {
+fs::path downloadPath() {
+    if (const char* override_root = getenv("FILEMGR_ROOT"); override_root && *override_root) {
+        return fs::path(override_root);
+    }
     const char* homeDir = getenv("HOME");
     if (homeDir == nullptr) {
         throw std::runtime_error("Could not determine home directory.");
-    } 
-    return (std::string(homeDir) + "/Downloads");
-}
-
-void putFileInDownload(const fs::path& file_path) {
-    fs::path download_path = downloadPath();
-    if (file_path.parent_path() == download_path) {
-        std::cout << "File already in Downloads: " << file_path.filename() << "\n";
-        return;
     }
-
-    fs::path dest = safeMove(file_path, download_path);
-    if (!dest.empty()) {
-        std::cout << "Moved recent file: " << file_path.filename()
-                  << " -> " << dest.filename() << "\n";
-    }
+    return fs::path(homeDir) / "Downloads";
 }
 
 fs::path uniqueDestination(const fs::path& dest_dir, const fs::path& filename) {
@@ -83,11 +72,15 @@ fs::path uniqueDestination(const fs::path& dest_dir, const fs::path& filename) {
     return dest;
 }
 
-fs::path safeMove(const fs::path& src, const fs::path& dest_dir) {
+fs::path safeMove(const Context& ctx, const fs::path& src, const fs::path& dest_dir) {
     std::error_code ec;
+    if (ctx.dry_run) {
+        return uniqueDestination(dest_dir, src.filename());
+    }
+
     fs::create_directories(dest_dir, ec);
     if (ec) {
-        std::cerr << "Error creating " << dest_dir << ": " << ec.message() << "\n";
+        ui::error("cannot create " + dest_dir.string() + ": " + ec.message());
         return {};
     }
 
@@ -102,7 +95,7 @@ fs::path safeMove(const fs::path& src, const fs::path& dest_dir) {
         }
     }
     if (ec) {
-        std::cerr << "Error moving " << src << ": " << ec.message() << "\n";
+        ui::error("cannot move " + src.string() + ": " + ec.message());
         return {};
     }
     return dest;
@@ -113,4 +106,22 @@ std::string lowerExtension(const fs::path& file_path) {
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     return ext;
+}
+
+std::string displayPath(const Context& ctx, const fs::path& p) {
+    std::error_code ec;
+    fs::path rel = fs::relative(p, ctx.root, ec);
+    if (ec || rel.empty() || *rel.begin() == "..") return p.string();
+    return rel.string();
+}
+
+bool isHidden(const fs::path& p) {
+    std::string name = p.filename().string();
+    return !name.empty() && name[0] == '.';
+}
+
+std::string topLevelFolder(const fs::path& p, const fs::path& root) {
+    fs::path rel = p.lexically_relative(root);
+    if (rel.empty() || !rel.has_parent_path()) return "";
+    return rel.begin()->string();
 }

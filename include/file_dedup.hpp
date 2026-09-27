@@ -9,5 +9,5 @@
 #include <sys/stat.h>
 #include <ctime>
 
-void deduplicateFiles();
+int deduplicateFiles(const Context& ctx);
 

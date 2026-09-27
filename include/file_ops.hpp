@@ -5,4 +5,4 @@
 #include <map>
 #include <string>
 
-void sortByType();
+int sortByType(const Context& ctx);
