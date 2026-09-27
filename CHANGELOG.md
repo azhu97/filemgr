@@ -5,6 +5,15 @@ merged into `main`.
 
 ## Unreleased
 
+### Undo journal (`feature/undo-journal`)
+- Every move made by `sort`, `recent`, `dedup`, `old` and `undo` is appended
+  to `~/.filemgr/journal` (or `$FILEMGR_STATE_DIR/journal`) as it happens.
+- New `history [id]` command lists runs or the moves of one run.
+- New `undo [id]` command reverses a run; undoing an undo re-applies it.
+- `--no-journal` skips recording for a single run.
+- New `safeMoveTo()` helper moves a file to an exact path (collision-safe).
+- Journal format is documented in `include/journal.hpp`.
+
 ### CLI overhaul (`feature/cli-overhaul`)
 - New argument parser: long/short options anywhere on the command line,
   `--help` globally and per command, `--version`.

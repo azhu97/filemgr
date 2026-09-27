@@ -25,6 +25,8 @@ Requires macOS and the Xcode command line tools (`xcode-select --install`).
 | `dedup`            | Move byte-identical duplicates into `DUPLICATES/`, keeping the oldest copy |
 | `old [days]`       | Archive files untouched for `days`+ days into `OLD/` (default 30) |
 | `upload <folder>`  | Upload a folder to Google Drive via `rclone` (`--remote NAME` to pick a remote) |
+| `history [id]`     | List recent runs, or every move made by run `id` (`--limit N`) |
+| `undo [id]`        | Reverse the last run (or run `id`), moving files back where they came from |
 | `help [command]`   | Show usage, or detailed help for one command                   |
 
 ### Global options
@@ -37,6 +39,7 @@ Requires macOS and the Xcode command line tools (`xcode-select --install`).
 | `-q`, `--quiet`     | Only errors and the final summary line                    |
 | `--no-color`        | Plain output (also honoured via `$NO_COLOR`)              |
 | `--time`            | Print how long the command took                           |
+| `--no-journal`      | Don't record this run's moves (it can't be undone)        |
 | `-h`, `--help`      | Help; `filemgr <command> --help` for a single command     |
 | `--version`         | Print the version                                         |
 
@@ -45,6 +48,23 @@ Options can go before or after the command: `filemgr -n sort` and
 default folder, which is handy for experimenting on a scratch directory.
 
 Exit status is `0` on success, `1` on a runtime error, and `2` on a usage error.
+
+## Undo
+
+Every command that moves files records each move in `~/.filemgr/journal`
+(override with `$FILEMGR_STATE_DIR`). Nothing is ever deleted, so any run can
+be reversed:
+
+```sh
+filemgr history          # #12 2026-09-27 10:02  dedup  4 moves
+filemgr history 12       # every move made by run #12
+filemgr undo             # reverse the most recent run
+filemgr undo 12          # reverse a specific run
+```
+
+`undo` is journaled as well, so undoing an undo re-applies the original run.
+If a file has since been moved or deleted it is skipped with a warning, and if
+its original name has been taken the file is restored as `name_1.ext`.
 
 ## Protected folders
 
@@ -72,20 +92,24 @@ filemgr/
 │   ├── cli.hpp           Argument parser (options, positionals, help formatting)
 │   ├── context.hpp       Context: managed root folder and run-wide flags
 │   ├── file_dedup.hpp
+│   ├── file_history.hpp  history / undo commands
 │   ├── file_old.hpp
 │   ├── file_ops.hpp
 │   ├── file_recent.hpp
 │   ├── file_upload.hpp
+│   ├── journal.hpp       Append-only move journal (runs, moves, undo markers)
 │   ├── ui.hpp            Colored, leveled, thread-safe terminal output
 │   └── utils.hpp         Shared helpers: safeMove, hashing, allowed-location check
 └── src/                  Implementation, one file per module
     ├── cli.cpp
     ├── main.cpp          Command table, global options, dispatch
     ├── file_dedup.cpp    dedup: size pre-filter + parallel SHA-256
+    ├── file_history.cpp  history listing and undo
     ├── file_old.cpp      old: archive stale files into OLD/
     ├── file_ops.cpp      sort: move files into type folders
     ├── file_recent.cpp   recent: surface recently modified files
     ├── file_upload.cpp   upload: rclone wrapper (spawned without a shell)
+    ├── journal.cpp
     ├── ui.cpp
     └── utils.cpp
 ```
@@ -98,4 +122,5 @@ Build output goes to `build/` (objects) and `./filemgr` (binary); both are git-i
 2. Implement it in `src/file_<name>.cpp`. Move files only through `safeMove()`
    so dry runs (and the undo journal) work automatically, and gate any recursive
    scan with `isInAllowedLocation()` so user folders stay untouched.
-3. Register it in the command table in `src/main.cpp`.
+3. Register it in the command table in `src/main.cpp`, with `journaled = true`
+   if it moves files.
