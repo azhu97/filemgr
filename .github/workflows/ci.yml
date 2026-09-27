@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (warnings are errors)
+        run: make -j"$(sysctl -n hw.ncpu)" CXXFLAGS="-std=c++17 -Wall -Wextra -Werror -O2"
+
+      - name: Test
+        run: make test CXXFLAGS="-std=c++17 -Wall -Wextra -Werror -O2"
+
+      - name: Lint man page
+        run: mandoc -Tlint -Wwarning man/filemgr.1
+
+      - name: Install into a scratch prefix
+        run: |
+          make install PREFIX="$RUNNER_TEMP/prefix"
+          "$RUNNER_TEMP/prefix/bin/filemgr" --version

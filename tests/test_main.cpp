@@ -32,9 +32,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     fs::path base = fs::path(base_dir);
-    // Keep tests away from the real ~/.filemgr and ~/.config.
+    // Keep tests away from the real ~/.filemgr, ~/.config and ~/.Trash.
     setenv("FILEMGR_STATE_DIR", (base / "state").c_str(), 1);
     setenv("FILEMGR_CONFIG", (base / "config").c_str(), 1);
+    setenv("FILEMGR_TRASH", (base / "trash").c_str(), 1);
     unsetenv("FILEMGR_ROOT");
 
     int passed = 0, failed = 0, index = 0;

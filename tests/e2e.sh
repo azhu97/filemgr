@@ -9,6 +9,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 export FILEMGR_STATE_DIR="$WORK/state"
 export FILEMGR_CONFIG="$WORK/config"
+export FILEMGR_TRASH="$WORK/trash"
 export NO_COLOR=1
 unset FILEMGR_ROOT
 
@@ -132,6 +133,43 @@ run find --larger 1K --paths | grep -q big.bin;           check "find --larger" 
 run find report --hidden --paths | grep -q ".git/report"; check "find --hidden"   [ $? -eq 0 ]
 run find zzz >/dev/null;                                   check "find no match exits 1" [ $? -eq 1 ]
 run find --larger lots >/dev/null 2>&1;                    check "find bad size exits 2" [ $? -eq 2 ]
+
+# --- clean (rules) ----------------------------------------------------------
+fresh
+printf '[rule "Old zips"]\next = zip\nolder = 7d\naction = trash\n' > "$FILEMGR_CONFIG"
+touch -t 202001010000 "$DL/old.zip"; touch "$DL/new.zip"
+run clean --list | grep -q "1 file matches"; check "clean --list counts matches" [ $? -eq 0 ]
+run -n clean >/dev/null;             check "clean dry run keeps file"  [ -f "$DL/old.zip" ]
+run clean >/dev/null
+check "clean trashes matching file"  [ -f "$WORK/trash/old.zip" ]
+check "clean keeps non-matching"     [ -f "$DL/new.zip" ]
+run undo >/dev/null;                 check "undo restores from trash"  [ -f "$DL/old.zip" ]
+printf '[rule "All"]\naction = trash\n' > "$FILEMGR_CONFIG"
+run clean >/dev/null 2>&1;           check "condition-less rule rejected" [ $? -eq 1 ]
+rm -f "$FILEMGR_CONFIG"
+
+# --- completions and docs ---------------------------------------------------
+"$BIN" completions zsh  > "$WORK/_filemgr" && zsh -n "$WORK/_filemgr"
+check "zsh completion is valid"       [ $? -eq 0 ]
+"$BIN" completions bash > "$WORK/filemgr.bash" && bash -n "$WORK/filemgr.bash"
+check "bash completion is valid"      [ $? -eq 0 ]
+"$BIN" completions fish | grep -q "complete -c filemgr"; check "fish completion generated" [ $? -eq 0 ]
+"$BIN" completions tcsh >/dev/null 2>&1; check "unknown shell exits 2" [ $? -eq 2 ]
+COMP_OUT="$(
+    PATH="$(dirname "$BIN"):$PATH" bash -c '
+        source "'"$WORK"'/filemgr.bash"
+        COMP_WORDS=(filemgr config ""); COMP_CWORD=2; _filemgr; echo "${COMPREPLY[*]}"'
+)"
+check "bash completes config actions" [ "$COMP_OUT" = "show path init edit" ]
+
+# Every command must be documented in the man page and README.
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+missing=""
+for c in $("$BIN" --help --no-color | awk '/^Commands:/{f=1;next} /^$/{f=0} f{print $1}'); do
+    grep -q "^\.B[R]* $c\b" "$ROOT_DIR/man/filemgr.1" || missing="$missing man:$c"
+    grep -q "\`$c" "$ROOT_DIR/README.md" || missing="$missing readme:$c"
+done
+[ -z "$missing" ]; check "all commands documented${missing}" [ $? -eq 0 ]
 
 # --- quiet ------------------------------------------------------------------
 fresh; touch "$DL/x.png"

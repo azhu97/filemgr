@@ -1,6 +1,6 @@
 # filemgr build
 #   make            build ./filemgr
-#   make install    install to $(PREFIX)/bin (default ~/.local)
+#   make install    install binary, man page and shell completions under $(PREFIX) (default ~/.local)
 #   make test       build and run unit + end-to-end tests
 #   make clean      remove build artifacts
 
@@ -48,11 +48,20 @@ test: $(TARGET) $(TEST_BIN)
 	@tests/e2e.sh ./$(TARGET)
 
 install: $(TARGET)
-	mkdir -p $(PREFIX)/bin
+	mkdir -p $(PREFIX)/bin $(PREFIX)/share/man/man1 \
+	         $(PREFIX)/share/zsh/site-functions $(PREFIX)/share/bash-completion/completions \
+	         $(PREFIX)/share/fish/vendor_completions.d
 	install -m 755 $(TARGET) $(PREFIX)/bin/$(TARGET)
+	install -m 644 man/filemgr.1 $(PREFIX)/share/man/man1/filemgr.1
+	./$(TARGET) completions zsh  > $(PREFIX)/share/zsh/site-functions/_filemgr
+	./$(TARGET) completions bash > $(PREFIX)/share/bash-completion/completions/filemgr
+	./$(TARGET) completions fish > $(PREFIX)/share/fish/vendor_completions.d/filemgr.fish
 
 uninstall:
-	rm -f $(PREFIX)/bin/$(TARGET)
+	rm -f $(PREFIX)/bin/$(TARGET) $(PREFIX)/share/man/man1/filemgr.1 \
+	      $(PREFIX)/share/zsh/site-functions/_filemgr \
+	      $(PREFIX)/share/bash-completion/completions/filemgr \
+	      $(PREFIX)/share/fish/vendor_completions.d/filemgr.fish
 
 clean:
 	rm -rf $(BUILD) $(TARGET)

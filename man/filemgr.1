@@ -1,0 +1,207 @@
+.TH FILEMGR 1 2026-09-27 "filemgr 2.0" "User Commands"
+.SH NAME
+filemgr \- keep your Downloads folder tidy
+.SH SYNOPSIS
+.B filemgr
+[\fIoptions\fR] \fIcommand\fR [\fIargs\fR]
+.SH DESCRIPTION
+.B filemgr
+sorts files into type folders, removes exact and near-duplicate copies,
+archives stale files, applies user-defined cleanup rules, reports disk usage,
+and can watch a folder to sort new downloads as they arrive.
+.PP
+By default it manages
+.IR ~/Downloads .
+It only ever moves files that sit directly in that folder or inside the
+folders it manages itself (the category folders such as
+.BR IMAGES ,
+plus
+.BR DUPLICATES ).
+Folders you create yourself, such as
+.BR PROTECTED ,
+are never touched.
+.PP
+Nothing is ever deleted. Every move is recorded in a journal and can be
+reversed with
+.BR "filemgr undo" .
+.SH COMMANDS
+.TP
+.B sort
+Move top-level files into type folders by extension.
+.TP
+.BR recent " [\fIn\fR]"
+Bring the \fIn\fR most recently modified files back to the top level (default 5).
+.TP
+.BR dedup " [\fB\-\-near\fR] [\fB\-\-threshold\fR \fIN\fR]"
+Move byte-identical duplicates into
+.BR DUPLICATES/ ,
+keeping the oldest copy. With
+.BR \-\-near ,
+also move visually similar images (resized, re-compressed or converted
+copies) into
+.BR DUPLICATES/NEAR/ ,
+keeping the highest-resolution copy.
+.I N
+is the maximum perceptual-hash distance out of 64 (default 6).
+.TP
+.BR old " [\fIdays\fR]"
+Move files not modified for \fIdays\fR or more (default 30) into
+.BR OLD/ .
+Files already in OLD/ are re-evaluated on each run.
+.TP
+.BR upload " \fIfolder\fR [\fB\-\-remote\fR \fINAME\fR]"
+Copy a folder to Google Drive with
+.BR rclone (1).
+.TP
+.BR watch " [\fB\-\-settle\fR \fISECONDS\fR] [\fB\-\-sort\-existing\fR] [\fB\-\-print\-plist\fR]"
+Stay running and sort each new file once it has finished downloading.
+Partial downloads (.crdownload, .part, ...) are ignored.
+.B \-\-print\-plist
+prints a
+.BR launchd (8)
+agent for running at login.
+.TP
+.BR clean " [\fIrule\fR ...] [\fB\-\-list\fR] [\fB\-\-names\fR]"
+Apply the cleanup rules from the config file (see
+.BR RULES ).
+.TP
+.BR stats " [\fB\-\-top\fR \fIN\fR] [\fB\-\-no\-dups\fR] [\fB\-\-html\fR \fIFILE\fR]"
+Report usage by type, folder and age, the largest files, and cleanup
+opportunities. Read-only.
+.TP
+.BR find " [\fIpattern\fR ...] [\fIfilters\fR]"
+Search by name (case-insensitive glob, or substring without wildcards).
+Filters:
+.BR \-\-type " \fICATEGORY\fR, " \-\-ext " \fILIST\fR, " \-\-larger " / " \-\-smaller " \fISIZE\fR, "
+.BR \-\-older " / " \-\-newer " \fIAGE\fR, " \-\-in " \fIFOLDER\fR."
+Output:
+.BR \-\-sort " date|size|name, " \-\-limit " \fIN\fR, " \-\-paths ", " \-\-print0 ", " \-\-hidden .
+Exits 1 when nothing matches.
+.TP
+.BR history " [\fIid\fR] [\fB\-\-limit\fR \fIN\fR]"
+List recent runs, or every move made by run \fIid\fR.
+.TP
+.BR undo " [\fIid\fR]"
+Reverse the most recent run (or run \fIid\fR). Undoing an undo re-applies the run.
+.TP
+.BR config " [show|path|init|edit]"
+Show the effective configuration, print the config file path, write a
+commented starter file
+.RB ( \-\-force
+to overwrite), or open it in
+.BR $EDITOR .
+.TP
+.BR completions " zsh|bash|fish"
+Print a shell completion script.
+.SH OPTIONS
+.TP
+.BR \-n ", " \-\-dry\-run
+Show what would happen without changing anything.
+.TP
+.BR \-p ", " \-\-path " \fIDIR\fR"
+Manage \fIDIR\fR instead of ~/Downloads.
+.TP
+.BR \-c ", " \-\-config " \fIFILE\fR"
+Read configuration from \fIFILE\fR.
+.TP
+.BR \-v ", " \-\-verbose
+Print extra detail.
+.TP
+.BR \-q ", " \-\-quiet
+Print only errors and the final summary.
+.TP
+.B \-\-no\-color
+Disable colored output.
+.TP
+.B \-\-no\-journal
+Do not record this run's moves (it cannot be undone).
+.TP
+.B \-\-time
+Print how long the command took.
+.TP
+.BR \-h ", " \-\-help
+Show help; \fBfilemgr\fR \fIcommand\fR \fB\-\-help\fR for one command.
+.TP
+.B \-\-version
+Print the version.
+.SH SIZES AND AGES
+Sizes take an optional binary unit:
+.BR K ", " M ", " G ", " T
+(e.g. 1.5G). Ages take
+.BR h ", " d ", " w ", " m " (30 days) or " y ;
+a bare number means days.
+.SH CONFIGURATION
+The config file is INI-style. Sections:
+.TP
+.B [general]
+.BR root ", " remote ", " old_days ", " recent_count ", " threads .
+.TP
+.B [categories]
+.IB FOLDER " = " "ext ext ..."
+adds a category folder or replaces a built-in one's extensions.
+.SH RULES
+Each
+.B [rule \(dqName\(dq]
+section has an action and at least one condition:
+.RS
+.nf
+[rule "Old installers"]
+ext = dmg pkg
+older = 14d
+action = trash
+.fi
+.RE
+.PP
+Conditions:
+.BR match " (globs), " ext ", " type ", " larger ", " smaller ", " older ", " newer ", "
+.BR in " (top-level folder, or . for the top level). "
+Actions:
+.B trash
+(move to ~/.Trash) or
+.BI "move " FOLDER\fR.
+.B enabled = false
+disables a rule. Each file gets the first rule it matches.
+.SH ENVIRONMENT
+.TP
+.B FILEMGR_ROOT
+Folder to manage (overridden by \fB\-\-path\fR).
+.TP
+.B FILEMGR_CONFIG
+Config file path. Otherwise
+.IR $XDG_CONFIG_HOME/filemgr/config " or " ~/.config/filemgr/config .
+.TP
+.B FILEMGR_STATE_DIR
+Where the journal and watch lock live (default ~/.filemgr).
+.TP
+.B FILEMGR_TRASH
+Where the \fBtrash\fR rule action moves files (default ~/.Trash).
+.TP
+.B NO_COLOR
+Disable colored output.
+.SH FILES
+.TP
+.I ~/.config/filemgr/config
+Configuration.
+.TP
+.I ~/.filemgr/journal
+Move journal used by \fBhistory\fR and \fBundo\fR.
+.TP
+.I ~/.filemgr/watch.lock
+Held by a running \fBwatch\fR.
+.TP
+.I ~/Library/Logs/filemgr-watch.log
+Log for the launchd agent generated by \fBwatch \-\-print\-plist\fR.
+.SH EXIT STATUS
+0 on success, 1 on a runtime error (or no matches for \fBfind\fR), 2 on a usage error.
+.SH EXAMPLES
+.nf
+filemgr -n sort                 # preview sorting
+filemgr dedup --near            # exact + near-duplicate images
+filemgr find --larger 1G --sort size
+filemgr stats --html report.html
+filemgr clean --list
+filemgr undo
+.fi
+.SH SEE ALSO
+.BR rclone (1),
+.BR launchctl (1)
