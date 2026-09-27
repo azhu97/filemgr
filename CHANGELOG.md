@@ -5,6 +5,13 @@ merged into `main`.
 
 ## Unreleased
 
+### Search (`feature/search`)
+- New read-only `find` command: name globs or substrings, `--type`, `--ext`,
+  `--larger`/`--smaller`, `--older`/`--newer`, `--in FOLDER`, `--sort`,
+  `--limit`, `--hidden`, and `--paths`/`--print0` for piping.
+- New `FileFilter` module (`filter.{hpp,cpp}`) with human-friendly size (`1.5G`)
+  and age (`2w`, `6m`) parsing, reused by the rules engine.
+
 ### Stats and reports (`feature/stats-report`)
 - New read-only `stats` command: usage by type, folder and last-modified age,
   the largest files, and cleanup opportunities (duplicate waste, stale files,
