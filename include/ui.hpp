@@ -8,7 +8,8 @@ namespace fs = std::filesystem;
 // printing (dedup reports from worker threads).
 namespace ui {
 
-enum class Verbosity { Quiet, Normal, Verbose };
+// Silent suppresses everything, including errors (used by the unit tests).
+enum class Verbosity { Silent, Quiet, Normal, Verbose };
 
 void configure(Verbosity verbosity, bool color);
 bool colorEnabled();

@@ -5,6 +5,14 @@ merged into `main`.
 
 ## Unreleased
 
+### Test suite (`feature/test-suite`)
+- `make test` builds and runs unit tests (`build/unit_tests`) and end-to-end
+  tests (`tests/e2e.sh`). Neither touches your real Downloads, state or config.
+- Tiny dependency-free framework in `tests/testing.hpp`.
+- Coverage: argument parsing, config parsing/validation, collision-safe moves,
+  dry runs, journal escaping, protected folders, and every file command
+  including undo/redo.
+
 ### Configuration (`feature/config`)
 - New INI-style config file at `~/.config/filemgr/config` (`--config FILE`,
   `$FILEMGR_CONFIG` and `$XDG_CONFIG_HOME` are respected).
