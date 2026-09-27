@@ -9,6 +9,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 export FILEMGR_STATE_DIR="$WORK/state"
 export FILEMGR_CONFIG="$WORK/config"
+export FILEMGR_TRASH="$WORK/trash"
 export NO_COLOR=1
 unset FILEMGR_ROOT
 
@@ -132,6 +133,20 @@ run find --larger 1K --paths | grep -q big.bin;           check "find --larger" 
 run find report --hidden --paths | grep -q ".git/report"; check "find --hidden"   [ $? -eq 0 ]
 run find zzz >/dev/null;                                   check "find no match exits 1" [ $? -eq 1 ]
 run find --larger lots >/dev/null 2>&1;                    check "find bad size exits 2" [ $? -eq 2 ]
+
+# --- clean (rules) ----------------------------------------------------------
+fresh
+printf '[rule "Old zips"]\next = zip\nolder = 7d\naction = trash\n' > "$FILEMGR_CONFIG"
+touch -t 202001010000 "$DL/old.zip"; touch "$DL/new.zip"
+run clean --list | grep -q "1 file matches"; check "clean --list counts matches" [ $? -eq 0 ]
+run -n clean >/dev/null;             check "clean dry run keeps file"  [ -f "$DL/old.zip" ]
+run clean >/dev/null
+check "clean trashes matching file"  [ -f "$WORK/trash/old.zip" ]
+check "clean keeps non-matching"     [ -f "$DL/new.zip" ]
+run undo >/dev/null;                 check "undo restores from trash"  [ -f "$DL/old.zip" ]
+printf '[rule "All"]\naction = trash\n' > "$FILEMGR_CONFIG"
+run clean >/dev/null 2>&1;           check "condition-less rule rejected" [ $? -eq 1 ]
+rm -f "$FILEMGR_CONFIG"
 
 # --- quiet ------------------------------------------------------------------
 fresh; touch "$DL/x.png"

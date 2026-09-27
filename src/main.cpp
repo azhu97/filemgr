@@ -16,6 +16,7 @@
 #include "stats.hpp"
 #include "file_find.hpp"
 #include "filter.hpp"
+#include "file_clean.hpp"
 #include "file_old.hpp"
 #include "file_upload.hpp"
 #include "file_history.hpp"
@@ -123,6 +124,12 @@ const std::vector<Command>& commands() {
                      throw UsageError("--settle must be a number of seconds between 0 and 3600");
              }
              return watchDownloads(ctx, options);
+         }},
+        {"clean", "[rule...]", "Apply the cleanup rules from your config (all enabled rules, or those named)",
+         {{"list", 0, "", "List rules and how many files each matches right now"}},
+         true, true,
+         [](const Context& ctx, const ParsedArgs& a) {
+             return cleanWithRules(ctx, a.positionals, a.has("list"));
          }},
         {"stats", "", "Report disk usage by type, folder and age, plus cleanup opportunities",
          {{"top", 0, "N", "Number of largest files to list (default 10)"},

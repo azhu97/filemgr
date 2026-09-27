@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 
 namespace {
@@ -54,6 +55,69 @@ bool validFolderName(const std::string& name) {
     return !name.empty() && name != "." && name != ".." && name.find('/') == std::string::npos;
 }
 
+// Parses `rule "Name"` / `rule Name` section headers; returns false otherwise.
+bool parseRuleHeader(const std::string& header, std::string& name) {
+    if (header.size() < 5 || lower(header.substr(0, 5)) != "rule " ) return false;
+    name = trim(header.substr(5));
+    if (name.size() >= 2 && name.front() == '"' && name.back() == '"') name = name.substr(1, name.size() - 2);
+    return true;
+}
+
+void applyRuleKey(Rule& rule, const std::string& key, const std::string& value, const std::string& where) {
+    try {
+        if (key == "match") {
+            std::istringstream in(value);
+            std::string pattern;
+            while (in >> std::quoted(pattern)) rule.filter.names.push_back(pattern);
+        } else if (key == "ext") {
+            rule.filter.addExtensions(value);
+        } else if (key == "type") {
+            rule.filter.category = value;
+        } else if (key == "larger") {
+            rule.filter.min_size = parseSize(value);
+        } else if (key == "smaller") {
+            rule.filter.max_size = parseSize(value);
+        } else if (key == "older") {
+            rule.filter.min_age = parseAge(value);
+        } else if (key == "newer") {
+            rule.filter.max_age = parseAge(value);
+        } else if (key == "in") {
+            if (value != "." && !validFolderName(value))
+                throw ConfigError(where + ": 'in' must be a top-level folder name or '.'");
+            rule.in = value;
+        } else if (key == "enabled") {
+            std::string v = lower(value);
+            if (v != "true" && v != "false" && v != "yes" && v != "no")
+                throw ConfigError(where + ": 'enabled' must be true or false");
+            rule.enabled = v == "true" || v == "yes";
+        } else if (key == "action") {
+            std::istringstream in(value);
+            std::string verb, target, extra;
+            in >> verb >> target >> extra;
+            verb = lower(verb);
+            if (verb == "trash" && target.empty()) {
+                rule.action = "trash";
+            } else if (verb == "move" && validFolderName(target) && extra.empty()) {
+                rule.action = "move";
+                rule.target = target;
+            } else {
+                throw ConfigError(where + ": action must be 'trash' or 'move FOLDER'");
+            }
+        } else {
+            throw ConfigError(where + ": unknown key '" + key + "' in rule \"" + rule.name + "\"");
+        }
+    } catch (const FilterError& e) {
+        throw ConfigError(where + ": " + e.what());
+    }
+}
+
+// Rules without conditions would act on every file; refuse them.
+void validateRule(const Rule& rule, const std::string& file) {
+    std::string where = file + ":" + std::to_string(rule.line) + ": rule \"" + rule.name + "\"";
+    if (rule.action.empty()) throw ConfigError(where + " has no action");
+    if (rule.filter.empty()) throw ConfigError(where + " needs at least one condition (match, ext, type, larger, smaller, older, newer)");
+}
+
 } // namespace
 
 std::map<std::string, std::string> Config::extensionMap() const {
@@ -98,6 +162,7 @@ Config loadConfig(const fs::path& file) {
     config.source = file;
 
     std::string section;
+    Rule* rule = nullptr;
     std::string line;
     int line_no = 0;
     while (std::getline(in, line)) {
@@ -111,9 +176,23 @@ Config loadConfig(const fs::path& file) {
 
         if (line.front() == '[') {
             if (line.back() != ']') throw ConfigError(where + ": unterminated section header");
-            section = lower(trim(line.substr(1, line.size() - 2)));
+            std::string header = trim(line.substr(1, line.size() - 2));
+            std::string rule_name;
+            rule = nullptr;
+            if (parseRuleHeader(header, rule_name)) {
+                if (rule_name.empty()) throw ConfigError(where + ": rule needs a name, e.g. [rule \"Old installers\"]");
+                for (const auto& r : config.rules)
+                    if (r.name == rule_name) throw ConfigError(where + ": duplicate rule \"" + rule_name + "\"");
+                config.rules.push_back(Rule{});
+                rule = &config.rules.back();
+                rule->name = rule_name;
+                rule->line = line_no;
+                section = "rule";
+                continue;
+            }
+            section = lower(header);
             if (section != "general" && section != "categories")
-                throw ConfigError(where + ": unknown section [" + section + "]");
+                throw ConfigError(where + ": unknown section [" + header + "]");
             continue;
         }
 
@@ -140,10 +219,13 @@ Config loadConfig(const fs::path& file) {
             } else {
                 config.categories.push_back({key, exts});
             }
+        } else if (section == "rule") {
+            applyRuleKey(*rule, lower(key), value, where);
         } else {
             throw ConfigError(where + ": key outside of a section");
         }
     }
+    for (const auto& r : config.rules) validateRule(r, file.filename().string());
     return config;
 }
 
@@ -178,6 +260,35 @@ std::string defaultConfigText() {
     }
     out << "#\n"
            "# Example: send spreadsheets to their own folder\n"
-           "# SPREADSHEETS = xls xlsx numbers csv\n";
+           "# SPREADSHEETS = xls xlsx numbers csv\n"
+           "\n"
+           "# Cleanup rules, run with 'filemgr clean' (preview with 'filemgr clean -n').\n"
+           "# Each rule needs an action and at least one condition. A file gets the\n"
+           "# first rule it matches. Rules only see files filemgr manages (top level,\n"
+           "# type folders, DUPLICATES), never your own folders.\n"
+           "#\n"
+           "#   match   = name globs, e.g. Screenshot*.png \"Zoom_*\"\n"
+           "#   ext     = extensions, e.g. dmg pkg\n"
+           "#   type    = category folder, e.g. INSTALLERS (or Other)\n"
+           "#   larger  = minimum size, e.g. 100M     smaller = maximum size\n"
+           "#   older   = last modified before, e.g. 14d, 6m, 1y\n"
+           "#   newer   = last modified within, e.g. 12h\n"
+           "#   in      = only files in this top-level folder ('.' for the top level)\n"
+           "#   action  = trash | move FOLDER   (everything goes through the undo journal)\n"
+           "#   enabled = false to switch a rule off\n"
+           "#\n"
+           "# [rule \"Old installers\"]\n"
+           "# ext = dmg pkg\n"
+           "# older = 14d\n"
+           "# action = trash\n"
+           "#\n"
+           "# [rule \"Stale duplicates\"]\n"
+           "# in = DUPLICATES\n"
+           "# older = 30d\n"
+           "# action = trash\n"
+           "#\n"
+           "# [rule \"Screenshots\"]\n"
+           "# match = Screenshot*.png \"Screen Shot*\"\n"
+           "# action = move SCREENSHOTS\n";
     return out.str();
 }
