@@ -4,4 +4,4 @@
 #include <iostream>
 #include <chrono>
 
-void archiveOld(int x);
+int archiveOld(const Context& ctx, int days);

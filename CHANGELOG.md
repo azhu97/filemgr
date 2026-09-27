@@ -5,6 +5,22 @@ merged into `main`.
 
 ## Unreleased
 
+### CLI overhaul (`feature/cli-overhaul`)
+- New argument parser: long/short options anywhere on the command line,
+  `--help` globally and per command, `--version`.
+- Global `--dry-run`, `--path DIR`, `--verbose`, `--quiet`, `--no-color`, `--time`.
+  `$FILEMGR_ROOT` overrides the default folder.
+- Colored, consistent output with a summary line per command (for example
+  "Moved 3 duplicates (12.4 MB)"). Execution time now only prints with `--time`/`--verbose`.
+- Invalid arguments (`old abc`) exit with status 2 and a message instead of crashing.
+- `dedup` only hashes files that share a size with another file (much faster
+  on large folders), skips empty files, and reports reclaimed space.
+- `recent` no longer pulls files back out of `DUPLICATES/`.
+- `old` collects stale files before moving them rather than moving mid-scan.
+- `upload` runs `rclone` without a shell (folder names are passed safely) and
+  accepts `--remote NAME`.
+- New modules: `cli`, `ui`, `context`.
+
 ### Safe moves (`feature/safe-move`)
 - New shared `safeMove()` / `uniqueDestination()` helpers in `utils` replace
   three duplicated copies of the `_1`, `_2` collision-avoidance logic.
