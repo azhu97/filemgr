@@ -1,4 +1,5 @@
 #include "file_dedup.hpp"
+#include "config.hpp"
 #include <thread>
 #include <vector>
 #include <mutex>
@@ -88,7 +89,8 @@ int deduplicateFiles(const Context& ctx) {
     };
 
     // 2. Start worker threads
-    unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
+    unsigned int num_threads = ctx.config->threads;
+    if (num_threads == 0) num_threads = std::max(1u, std::thread::hardware_concurrency());
     std::vector<std::thread> threads;
     for (unsigned int i = 0; i < num_threads; ++i) {
         threads.emplace_back(worker);

@@ -1,4 +1,5 @@
 #include "file_ops.hpp"
+#include "config.hpp"
 
 namespace fs = std::filesystem;
 
@@ -6,41 +7,8 @@ int sortByType(const Context& ctx) {
     const fs::path& path = ctx.root;
     ui::info("Sorting files in " + ui::bold(path.string()));
 
-    // mapping for file extensions to directories
-    std::map<std::string, std::string> typeMap = {
-        {".jpeg", "IMAGES"},
-        {".jpg", "IMAGES"},
-        {".png", "IMAGES"},
-        {".gif", "IMAGES"},
-        {".heic", "IMAGES"},
-        {".mpg", "VIDEOS"},
-        {".mp4", "VIDEOS"},
-        {".mkv", "VIDEOS"},
-        {".mp3", "AUDIO"},
-        {".pdf", "DOCUMENTS"},
-        {".docx", "DOCUMENTS"},
-        {".txt", "DOCUMENTS"},
-        {".pptx", "DOCUMENTS"},
-        {".zip", "COMPRESSED"},
-        {".tar", "COMPRESSED"},
-        {".gz", "COMPRESSED"},
-        {".rar", "COMPRESSED"},
-        {".exe", "INSTALLERS"},
-        {".dmg", "INSTALLERS"},
-        {".sql", "CODE"},
-        {".cpp", "CODE"},
-        {".py", "CODE"},
-        {".js", "CODE"},
-        {".html", "CODE"},
-        {".css", "CODE"},
-        {".java", "CODE"},
-        {".c", "CODE"},
-        {".h", "CODE"},
-        {".rb", "CODE"},
-        {".go", "CODE"},
-        {".rs", "CODE"},
-        {".ts", "CODE"}
-    };
+    // Extension -> folder mapping from the config (built-in defaults plus user categories)
+    const std::map<std::string, std::string> typeMap = ctx.config->extensionMap();
 
     std::size_t moved = 0;
     for (const auto& entry : fs::directory_iterator(path)) {
