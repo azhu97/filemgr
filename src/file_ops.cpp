@@ -4,7 +4,7 @@
 namespace fs = std::filesystem;
 
 fs::path sortOneFile(const Context& ctx, const fs::path& file,
-                     const std::map<std::string, std::string>& typeMap) {
+                     const std::map<std::string, std::string>& typeMap, bool report) {
     std::error_code ec;
     if (!fs::is_regular_file(file, ec) || isHidden(file)) {
         return {}; // skip directories, symlinks to dirs, dotfiles
@@ -18,7 +18,7 @@ fs::path sortOneFile(const Context& ctx, const fs::path& file,
     }
 
     fs::path newPath = safeMove(ctx, file, ctx.root / it->second);
-    if (!newPath.empty()) {
+    if (!newPath.empty() && report) {
         ui::action("sort", file.filename().string(), displayPath(ctx, newPath));
     }
     return newPath;
