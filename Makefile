@@ -1,39 +1,42 @@
-# Compiler settings
-CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O2
-LDFLAGS = -framework CoreFoundation -framework Security
+# filemgr build
+#   make            build ./filemgr
+#   make install    install to $(PREFIX)/bin (default ~/.local)
+#   make clean      remove build artifacts
 
-# Directories
-SRC_DIR = .
-OBJ_DIR = obj
-BIN_DIR = bin
+CXX      ?= g++
+CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
+CPPFLAGS += -Iinclude -MMD -MP
+LDFLAGS  += -framework CoreFoundation -framework Security
 
-# Files
-SOURCES = deduplicate.cpp
-OBJECTS = $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
-TARGET = $(BIN_DIR)/dedupe
+PREFIX   ?= $(HOME)/.local
+BUILD    := build
+TARGET   := filemgr
 
-# Default target
+SOURCES  := $(wildcard src/*.cpp)
+OBJECTS  := $(SOURCES:src/%.cpp=$(BUILD)/%.o)
+DEPS     := $(OBJECTS:.o=.d)
+
 all: $(TARGET)
 
-# Link executable
 $(TARGET): $(OBJECTS)
-	mkdir -p $(BIN_DIR)
-	$(CXX) $(OBJECTS) -o $@ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-# Compile source files
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	mkdir -p $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(BUILD)/%.o: src/%.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
-# Clean build artifacts
-clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+$(BUILD):
+	mkdir -p $@
 
-# Install to system
 install: $(TARGET)
-	mkdir -p $(HOME)/.local/bin
-	cp $(TARGET) $(HOME)/.local/bin/dedupe
-	chmod +x $(HOME)/.local/bin/dedupe
+	mkdir -p $(PREFIX)/bin
+	install -m 755 $(TARGET) $(PREFIX)/bin/$(TARGET)
 
-.PHONY: all clean install
+uninstall:
+	rm -f $(PREFIX)/bin/$(TARGET)
+
+clean:
+	rm -rf $(BUILD) $(TARGET)
+
+-include $(DEPS)
+
+.PHONY: all install uninstall clean
