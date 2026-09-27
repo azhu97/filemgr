@@ -1,4 +1,5 @@
 #include "utils.hpp"
+#include "journal.hpp"
 #include <algorithm>
 #include <cctype>
 
@@ -73,9 +74,14 @@ fs::path uniqueDestination(const fs::path& dest_dir, const fs::path& filename) {
 }
 
 fs::path safeMove(const Context& ctx, const fs::path& src, const fs::path& dest_dir) {
+    return safeMoveTo(ctx, src, dest_dir / src.filename());
+}
+
+fs::path safeMoveTo(const Context& ctx, const fs::path& src, const fs::path& desired) {
     std::error_code ec;
+    const fs::path dest_dir = desired.parent_path();
     if (ctx.dry_run) {
-        return uniqueDestination(dest_dir, src.filename());
+        return uniqueDestination(dest_dir, desired.filename());
     }
 
     fs::create_directories(dest_dir, ec);
@@ -84,7 +90,7 @@ fs::path safeMove(const Context& ctx, const fs::path& src, const fs::path& dest_
         return {};
     }
 
-    fs::path dest = uniqueDestination(dest_dir, src.filename());
+    fs::path dest = uniqueDestination(dest_dir, desired.filename());
     fs::rename(src, dest, ec);
     if (ec == std::errc::cross_device_link) {
         // Different volume: copy, then remove the original only if the copy succeeded.
@@ -97,6 +103,9 @@ fs::path safeMove(const Context& ctx, const fs::path& src, const fs::path& dest_
     if (ec) {
         ui::error("cannot move " + src.string() + ": " + ec.message());
         return {};
+    }
+    if (ctx.journal) {
+        ctx.journal->recordMove(src, dest);
     }
     return dest;
 }
