@@ -7,7 +7,7 @@
 CXX      ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
 CPPFLAGS += -Iinclude -MMD -MP
-LDFLAGS  += -framework CoreFoundation -framework Security -framework CoreGraphics -framework ImageIO
+LDFLAGS  += -framework CoreFoundation -framework Security -framework CoreGraphics -framework ImageIO -framework CoreServices
 
 PREFIX   ?= $(HOME)/.local
 BUILD    := build

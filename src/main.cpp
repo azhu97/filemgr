@@ -12,6 +12,7 @@
 #include "file_recent.hpp"
 #include "file_dedup.hpp"
 #include "file_near.hpp"
+#include "file_watch.hpp"
 #include "file_old.hpp"
 #include "file_upload.hpp"
 #include "file_history.hpp"
@@ -99,6 +100,26 @@ const std::vector<Command>& commands() {
          [](const Context& ctx, const ParsedArgs& a) {
              if (a.positionals.empty()) throw UsageError("upload requires a folder name");
              return uploadFolder(ctx, a.positionals[0], a.get("remote", ctx.config->remote));
+         }},
+        {"watch", "", "Sort new files automatically as they arrive (runs until Ctrl-C)",
+         {{"settle", 's', "SECONDS", "Quiet period before a new file is sorted (default 2)"},
+          {"sort-existing", 0, "", "Sort files already in the folder at startup"},
+          {"print-plist", 0, "", "Print a launchd agent plist for running watch at login"}},
+         true, true,
+         [](const Context& ctx, const ParsedArgs& a) {
+             if (a.has("print-plist")) return printLaunchdPlist(ctx);
+             WatchOptions options;
+             options.sort_existing = a.has("sort-existing");
+             if (a.has("settle")) {
+                 try {
+                     options.settle_seconds = std::stod(a.get("settle"));
+                 } catch (const std::exception&) {
+                     options.settle_seconds = -1;
+                 }
+                 if (options.settle_seconds < 0 || options.settle_seconds > 3600)
+                     throw UsageError("--settle must be a number of seconds between 0 and 3600");
+             }
+             return watchDownloads(ctx, options);
          }},
         {"history", "[id]", "List recent runs, or every move made by run <id>",
          {{"limit", 'l', "N", "Number of runs to list (default 15)"}}, false, false,
