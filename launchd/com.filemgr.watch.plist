@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd agent that runs `filemgr watch` at login and restarts it if it crashes.
+
+  Easiest: generate a filled-in copy with
+      filemgr watch --print-plist > ~/Library/LaunchAgents/com.filemgr.watch.plist
+
+  Or copy this template and replace:
+      __FILEMGR__  absolute path to the filemgr binary (e.g. /Users/you/.local/bin/filemgr)
+      __ROOT__     folder to watch (e.g. /Users/you/Downloads)
+      __LOG__      log file (e.g. /Users/you/Library/Logs/filemgr-watch.log)
+
+  Then: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.filemgr.watch.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.filemgr.watch</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__FILEMGR__</string>
+        <string>watch</string>
+        <string>--path</string>
+        <string>__ROOT__</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>StandardOutPath</key>
+    <string>__LOG__</string>
+    <key>StandardErrorPath</key>
+    <string>__LOG__</string>
+</dict>
+</plist>

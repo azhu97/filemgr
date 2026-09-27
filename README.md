@@ -26,6 +26,7 @@ Requires macOS and the Xcode command line tools (`xcode-select --install`).
 | `dedup [--near]`   | Move byte-identical duplicates into `DUPLICATES/`, keeping the oldest copy. `--near` also moves visually similar images (resized, re-compressed, converted) into `DUPLICATES/NEAR/`; tune with `--threshold N` |
 | `old [days]`       | Archive files untouched for `days`+ days into `OLD/` (default 30) |
 | `upload <folder>`  | Upload a folder to Google Drive via `rclone` (`--remote NAME` to pick a remote) |
+| `watch`            | Sort new files automatically as they land (runs until Ctrl-C; see below) |
 | `history [id]`     | List recent runs, or every move made by run `id` (`--limit N`) |
 | `undo [id]`        | Reverse the last run (or run `id`), moving files back where they came from |
 | `config [action]`  | `show` the effective config, print its `path`, `init` a starter file, or `edit` it |
@@ -92,6 +93,37 @@ filemgr undo 12          # reverse a specific run
 If a file has since been moved or deleted it is skipped with a warning, and if
 its original name has been taken the file is restored as `name_1.ext`.
 
+## Automatic sorting with `watch`
+
+`filemgr watch` stays running and sorts each new file into its type folder as
+soon as the download finishes. It waits for the file to stop changing and
+ignores in-progress `.crdownload`/`.part` files.
+
+```sh
+filemgr watch                    # foreground, Ctrl-C to stop
+filemgr watch --settle 5         # wait 5s of quiet before sorting
+filemgr watch --sort-existing    # also sort what's already there at startup
+```
+
+To run it at login as a launchd agent:
+
+```sh
+filemgr watch --print-plist > ~/Library/LaunchAgents/com.filemgr.watch.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.filemgr.watch.plist
+tail -f ~/Library/Logs/filemgr-watch.log
+```
+
+To stop and remove it:
+
+```sh
+launchctl bootout gui/$(id -u)/com.filemgr.watch
+rm ~/Library/LaunchAgents/com.filemgr.watch.plist
+```
+
+Only one watcher can run at a time. macOS may ask for permission to access
+Downloads the first time the agent runs. A hand-editable template lives in
+`launchd/com.filemgr.watch.plist`.
+
 ## Protected folders
 
 filemgr only ever touches files sitting directly in Downloads or inside the
@@ -114,6 +146,8 @@ filemgr/
 ├── docs/                 Design documents for larger features
 │   ├── near-duplicate-detection.md
 │   └── watch-daemon.md
+├── launchd/
+│   └── com.filemgr.watch.plist  launchd agent template for `watch`
 ├── include/              Public headers, one per module
 │   ├── cli.hpp           Argument parser (options, positionals, help formatting)
 │   ├── config.hpp        Config file format, defaults and loader
@@ -126,6 +160,7 @@ filemgr/
 │   ├── file_ops.hpp
 │   ├── file_recent.hpp
 │   ├── file_upload.hpp
+│   ├── file_watch.hpp    watch command and launchd plist generation
 │   ├── image_hash.hpp    Perceptual image fingerprints (dHash + color grid)
 │   ├── journal.hpp       Append-only move journal (runs, moves, undo markers)
 │   ├── ui.hpp            Colored, leveled, thread-safe terminal output
@@ -139,9 +174,10 @@ filemgr/
 │   ├── file_history.cpp  history listing and undo
 │   ├── file_near.cpp     Near-duplicate grouping, keeps highest-resolution copy
 │   ├── file_old.cpp      old: archive stale files into OLD/
-│   ├── file_ops.cpp      sort: move files into type folders
+│   ├── file_ops.cpp      sort: move files into type folders (sortOneFile shared with watch)
 │   ├── file_recent.cpp   recent: surface recently modified files
 │   ├── file_upload.cpp   upload: rclone wrapper (spawned without a shell)
+│   ├── file_watch.cpp    FSEvents stream, settle/debounce logic, lock file
 │   ├── image_hash.cpp    ImageIO decoding + hashing
 │   ├── journal.cpp
 │   ├── ui.cpp
